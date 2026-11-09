@@ -41,6 +41,15 @@ const VEHICULOS = Array.from({ length: 10 }, (_, i) => {
   };
 });
 
+// Usuarios de demostración. password_hash queda vacío: el login lo implementa Daslav.
+const USUARIOS = [
+  { rol: 'administrador', nombre: 'Admin VoyBus', alias: 'admin', estado: 'habilitado' },
+  { rol: 'conductor', nombre: 'Carlos Rojas', alias: 'crojas', estado: 'habilitado', identificador: 'COND-001' },
+  { rol: 'conductor', nombre: 'María Soto', alias: 'msoto', estado: 'habilitado', identificador: 'COND-002' },
+  { rol: 'conductor', nombre: 'Luis Pérez', alias: 'lperez', estado: 'deshabilitado', identificador: 'COND-003' },
+  { rol: 'pasajero', nombre: 'Ana Pasajera', alias: 'ana', estado: 'habilitado' },
+];
+
 function seed(db) {
   const tx = db.transaction(() => {
     const insLinea = db.prepare('INSERT INTO lineas (codigo,nombre,color,estado_servicio) VALUES (?,?,?,?)');
@@ -64,6 +73,10 @@ function seed(db) {
         paradas.forEach((p, i) => insRP.run(recId, i + 1, parId[p]));
       }
     }
+        const insUsu = db.prepare(
+      'INSERT INTO usuarios (rol,nombre_visible,alias,estado,identificador) VALUES (?,?,?,?,?)',
+    );
+    for (const u of USUARIOS) insUsu.run(u.rol, u.nombre, u.alias, u.estado, u.identificador ?? null);
 
     for (const v of VEHICULOS) insVeh.run(v.identificador, v.patente, v.capacidad, v.estado);
   });
