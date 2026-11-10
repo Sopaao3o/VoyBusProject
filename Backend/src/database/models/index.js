@@ -4,6 +4,7 @@ const definirLinea = require('./linea');
 const definirRecorrido = require('./recorrido');
 const definirParadero = require('./paradero');
 const definirRecorridoParadero = require('./recorrido-paradero');
+const definirVehiculo = require('./vehiculo');
 
 /** @param {import('sequelize').Sequelize} sequelize */
 function initModels(sequelize) {
@@ -12,6 +13,7 @@ function initModels(sequelize) {
   const Recorrido = definirRecorrido(sequelize);
   const Paradero = definirParadero(sequelize);
   const RecorridoParadero = definirRecorridoParadero(sequelize);
+  const Vehiculo = definirVehiculo(sequelize);
 
   // Una línea tiene recorridos (ida y vuelta)
   Linea.hasMany(Recorrido, { foreignKey: 'linea_id', as: 'recorridos' });
@@ -23,7 +25,7 @@ function initModels(sequelize) {
   Paradero.hasMany(RecorridoParadero, { foreignKey: 'paradero_id', as: 'paradas' });
   RecorridoParadero.belongsTo(Paradero, { foreignKey: 'paradero_id', as: 'paradero' });
 
-  return { sequelize, Usuario, Linea, Recorrido, Paradero, RecorridoParadero };
+  return { sequelize, Usuario, Linea, Recorrido, Paradero, RecorridoParadero, Vehiculo };
 }
 
 module.exports = { initModels };
