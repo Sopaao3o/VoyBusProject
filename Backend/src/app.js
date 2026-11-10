@@ -7,19 +7,20 @@ const healthRoutes = require('./routes/health.routes');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
-// TRANSITORIO: turnos (ADM-03) sigue con la base vieja hasta la Etapa 3.
-const { createShiftsService } = require('./modules/shifts/shifts.service');
-const { createShiftsRoutes } = require('./modules/shifts/shifts.routes');
-
-const esV1 = (req) => req.originalUrl.startsWith('/api/v1');
+const { createTurnosService } = require('./modules/turnos/turnos.service');
+const { createTurnosController } = require('./modules/turnos/turnos.controller');
+const { createTurnosRoutes } = require('./modules/turnos/turnos.routes');
+const { createConductorService } = require('./modules/conductor/conductor.service');
+const { createConductorController } = require('./modules/conductor/conductor.controller');
+const { createConductorRoutes, createConductorAdminRoutes } = require('./modules/conductor/conductor.routes');
 
 /**
- * @param {object} [deps]
- * @param {ReturnType<import('./database/models').initModels>} [deps.models] modelos Sequelize
- * @param {import('node:sqlite').DatabaseSync} [deps.db] base vieja (solo para turnos, transitorio)
+ * @param {object} deps
+ * @param {ReturnType<import('./database/models').initModels>} deps.models modelos Sequelize
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
+ * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
  */
-function createApp({ models, db, registro = false } = {}) {
+function createApp({ models, registro = false, ahora }) {
   const app = express();
 
   app.use(cors());
@@ -27,12 +28,17 @@ function createApp({ models, db, registro = false } = {}) {
   if (registro) app.use(morgan('dev'));
 
   app.use('/api/health', healthRoutes);
-  if (models) app.use('/api/v1', createRedRoutes(createRedController(createRedService(models))));
-  if (db) app.use('/api/admin', createShiftsRoutes(createShiftsService(db)));
+
+  const conductor = createConductorController(createConductorService(models, { ahora }));
+  const v1 = express.Router();
+  v1.use(createRedRoutes(createRedController(createRedService(models))));
+  v1.use('/admin', createTurnosRoutes(createTurnosController(createTurnosService(models))));
+  v1.use('/admin', createConductorAdminRoutes(conductor));
+  v1.use('/conductor', createConductorRoutes(conductor));
+  app.use('/api/v1', v1);
 
   app.use((req, res) => {
-    const mensaje = 'Recurso no encontrado';
-    res.status(404).json(esV1(req) ? { error: { code: 'NO_ENCONTRADO', message: mensaje } } : { error: mensaje });
+    res.status(404).json({ error: { code: 'NO_ENCONTRADO', message: 'Recurso no encontrado' } });
   });
 
   // eslint-disable-next-line no-unused-vars
@@ -50,8 +56,7 @@ function createApp({ models, db, registro = false } = {}) {
       message = 'Error interno del servidor';
       details = undefined;
     }
-    // Formato nuevo en /api/v1; el viejo se mantiene mientras turnos no se migre.
-    res.status(status).json(esV1(req) ? { error: { code, message, details } } : { error: message });
+    res.status(status).json({ error: { code, message, details } });
   });
 
   return app;

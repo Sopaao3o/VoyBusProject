@@ -23,7 +23,8 @@ module.exports = {
         termino_real TEXT,
         estado_vehiculo_recibido TEXT,
         estado_vehiculo_entregado TEXT,
-        justificacion_atraso TEXT,
+                justificacion_atraso TEXT,
+        margen_tolerancia_min INTEGER NOT NULL DEFAULT 5 CHECK (margen_tolerancia_min >= 0),
         estado TEXT NOT NULL DEFAULT 'programado' CHECK (estado IN ('programado','en_curso','finalizado')),
         CHECK (termino_planificado > inicio_planificado)
       )`,

@@ -1,14 +1,27 @@
 // PLACEHOLDER de autenticación.
-// Daslav implementará el login (JWT). Cuando esté listo, solo hay que reemplazar
-// el cuerpo de requireRole: verificar el token, cargar req.user y comprobar el rol.
-// Las rutas ya lo usan, así que no habrá que tocarlas.
+// Daslav implementa las sesiones (token opaco en "Authorization: Bearer"). Cuando estén listas,
+// solo hay que reemplazar el cuerpo de estas dos funciones; las rutas ya las usan y no se tocan.
+const { HttpError } = require('../utils/httpErrors');
 
 function requireRole(...roles) {
   // eslint-disable-next-line no-unused-vars
   return (req, res, next) => {
-    // TODO(auth): validar token y que req.user.rol esté en `roles`.
+    // TODO(auth): validar la sesión y que el rol del usuario esté en `roles`.
     next();
   };
 }
 
-module.exports = { requireRole };
+/**
+ * Devuelve el id del usuario que hace la petición.
+ * TEMPORAL: se lee del encabezado "x-user-id" (solo para desarrollo y pruebas).
+ * TODO(auth): reemplazar por `return req.auth.userId;` cuando existan las sesiones.
+ */
+function usuarioActual(req) {
+  const id = Number(req.headers['x-user-id']);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new HttpError(401, 'No se pudo identificar al usuario (falta el encabezado x-user-id)');
+  }
+  return id;
+}
+
+module.exports = { requireRole, usuarioActual };
