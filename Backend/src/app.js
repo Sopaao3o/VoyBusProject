@@ -7,7 +7,7 @@ const { createNetworkRoutes } = require('./modules/network/network.routes');
 const { createShiftsService } = require('./modules/shifts/shifts.service');
 const { createShiftsRoutes } = require('./modules/shifts/shifts.routes');
 
-/** @param {{ db?: import('better-sqlite3').Database }} [deps] */
+/** @param {{ db?: import('node:sqlite').DatabaseSync }} [deps] */
 function createApp({ db } = {}) {
   const app = express();
 
