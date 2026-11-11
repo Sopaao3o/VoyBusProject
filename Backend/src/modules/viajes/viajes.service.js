@@ -12,7 +12,17 @@ const TEXTO_CIERRE = {
  * @param {{ ahora?: () => Date }} [opciones] `ahora` permite controlar el reloj en las pruebas
  */
 function createViajesService(models, { ahora = () => new Date() } = {}) {
-  const { sequelize, Usuario, Paradero, Recorrido, Linea, Viaje, RecorridoParadero, SolicitudParada, UbicacionVehiculo } = models;
+  const {
+    sequelize,
+    Usuario,
+    Paradero,
+    Recorrido,
+    Linea,
+    Viaje,
+    RecorridoParadero,
+    SolicitudParada,
+    UbicacionVehiculo,
+  } = models;
   const ahoraISO = () => ahora().toISOString();
   const abierta = { [Op.ne]: 'cerrada' };
 
@@ -65,7 +75,10 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
       transaction,
     });
     if (!s) return null;
-    const parada = await RecorridoParadero.findOne({ where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id }, transaction });
+    const parada = await RecorridoParadero.findOne({
+      where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id },
+      transaction,
+    });
     return presentarSolicitud(s, s.paradero, parada?.orden ?? null);
   }
 
@@ -77,12 +90,21 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
    * (Pasar cerca de un paradero no prueba que el vehículo se haya detenido: nunca se marca "atendida".)
    */
   async function actualizarSolicitudes(viaje, transaction) {
-    const abiertas = await SolicitudParada.findAll({ where: { viaje_id: viaje.id, estado: abierta }, transaction });
+    const abiertas = await SolicitudParada.findAll({
+      where: { viaje_id: viaje.id, estado: abierta },
+      transaction,
+    });
     let cerradas = 0;
     for (const s of abiertas) {
-      const parada = await RecorridoParadero.findOne({ where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id }, transaction });
+      const parada = await RecorridoParadero.findOne({
+        where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id },
+        transaction,
+      });
       if (parada.orden <= viaje.ultimo_orden_superado) {
-        await s.update({ estado: 'cerrada', motivo_cierre: 'paradero_superado', cerrada_en: ahoraISO() }, { transaction });
+        await s.update(
+          { estado: 'cerrada', motivo_cierre: 'paradero_superado', cerrada_en: ahoraISO() },
+          { transaction },
+        );
         cerradas++;
       } else {
         const estado = parada.orden === viaje.ultimo_orden_superado + 1 ? 'proxima' : 'enviada';
@@ -99,7 +121,10 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         await exigirPasajero(pasajeroId, transaction);
         const viaje = await viajeEnCurso(viajeId, transaction);
         const paradas = await RecorridoParadero.findAll({
-          where: { recorrido_id: viaje.recorrido_id, orden: { [Op.gt]: viaje.ultimo_orden_superado } },
+          where: {
+            recorrido_id: viaje.recorrido_id,
+            orden: { [Op.gt]: viaje.ultimo_orden_superado },
+          },
           include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
           order: [['orden', 'ASC']],
           transaction,
@@ -131,12 +156,14 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
             transaction,
           });
           if (!parada) throw badRequest('Ese paradero no pertenece al recorrido de este viaje');
-          if (parada.orden <= viaje.ultimo_orden_superado) throw conflict('El vehículo ya superó ese paradero');
+          if (parada.orden <= viaje.ultimo_orden_superado)
+            throw conflict('El vehículo ya superó ese paradero');
           const pendiente = await SolicitudParada.findOne({
             where: { viaje_id: viajeId, pasajero_id: pasajeroId, estado: abierta },
             transaction,
           });
-          if (pendiente) throw conflict('Ya tienes una solicitud de parada pendiente en este viaje');
+          if (pendiente)
+            throw conflict('Ya tienes una solicitud de parada pendiente en este viaje');
 
           const solicitud = await SolicitudParada.create(
             {
@@ -152,7 +179,8 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         });
       } catch (err) {
         // Dos envíos simultáneos: la base (índice único parcial) deja pasar solo uno.
-        if (err instanceof UniqueConstraintError) throw conflict('Ya tienes una solicitud de parada pendiente en este viaje');
+        if (err instanceof UniqueConstraintError)
+          throw conflict('Ya tienes una solicitud de parada pendiente en este viaje');
         throw err;
       }
     },
@@ -182,7 +210,12 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         if (!siguiente) throw conflict('El vehículo ya superó el último paradero del recorrido');
         await viaje.update({ ultimo_orden_superado: siguiente.orden }, { transaction });
         await UbicacionVehiculo.create(
-          { viaje_id: viajeId, latitud: siguiente.paradero.latitud, longitud: siguiente.paradero.longitud, registrado_en: ahoraISO() },
+          {
+            viaje_id: viajeId,
+            latitud: siguiente.paradero.latitud,
+            longitud: siguiente.paradero.longitud,
+            registrado_en: ahoraISO(),
+          },
           { transaction },
         );
         const cerradas = await actualizarSolicitudes(viaje, transaction);

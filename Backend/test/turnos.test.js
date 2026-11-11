@@ -41,8 +41,16 @@ const turno = (over = {}) => ({
   inicio_planificado: dia(10, '08:00'),
   termino_planificado: dia(10, '16:00'),
   viajes: [
-    { recorrido_id: 1, inicio_planificado: dia(10, '08:30'), termino_planificado: dia(10, '09:30') },
-    { recorrido_id: 2, inicio_planificado: dia(10, '09:45'), termino_planificado: dia(10, '10:45') },
+    {
+      recorrido_id: 1,
+      inicio_planificado: dia(10, '08:30'),
+      termino_planificado: dia(10, '09:30'),
+    },
+    {
+      recorrido_id: 2,
+      inicio_planificado: dia(10, '09:45'),
+      termino_planificado: dia(10, '10:45'),
+    },
   ],
   ...over,
 });
@@ -53,14 +61,34 @@ test('ADM-03: crea un turno con viajes ordenados por horario', async () => {
   const { status, body } = await call('POST', '/turnos', invertido);
   assert.equal(status, 201);
   assert.equal(body.data.estado, 'programado');
-  assert.deepEqual(body.data.viajes.map((v) => [v.orden_en_turno, v.recorrido_id, v.sentido]), [[1, 1, 'ida'], [2, 2, 'vuelta']]);
+  assert.deepEqual(
+    body.data.viajes.map((v) => [v.orden_en_turno, v.recorrido_id, v.sentido]),
+    [
+      [1, 1, 'ida'],
+      [2, 2, 'vuelta'],
+    ],
+  );
   assert.equal(body.data.viajes[0].linea_codigo, '103');
   assert.equal(body.data.conductor_nombre, 'Carlos Rojas');
 });
 
 test('ADM-03: rechaza turnos superpuestos del mismo conductor', async () => {
-  const { status, body } = await call('POST', '/turnos', turno({ vehiculo_id: 2, inicio_planificado: dia(10, '15:00'), termino_planificado: dia(10, '20:00'),
-    viajes: [{ recorrido_id: 1, inicio_planificado: dia(10, '16:00'), termino_planificado: dia(10, '17:00') }] }));
+  const { status, body } = await call(
+    'POST',
+    '/turnos',
+    turno({
+      vehiculo_id: 2,
+      inicio_planificado: dia(10, '15:00'),
+      termino_planificado: dia(10, '20:00'),
+      viajes: [
+        {
+          recorrido_id: 1,
+          inicio_planificado: dia(10, '16:00'),
+          termino_planificado: dia(10, '17:00'),
+        },
+      ],
+    }),
+  );
   assert.equal(status, 409);
   assert.equal(body.error.code, 'CONFLICTO');
   assert.match(body.error.message, /conductor/);
@@ -73,26 +101,59 @@ test('ADM-03: rechaza turnos superpuestos del mismo vehículo', async () => {
 });
 
 test('ADM-03: turnos consecutivos (sin superposición) sí se aceptan', async () => {
-  const { status } = await call('POST', '/turnos', turno({
-    inicio_planificado: dia(10, '16:00'), termino_planificado: dia(10, '22:00'),
-    viajes: [{ recorrido_id: 1, inicio_planificado: dia(10, '17:00'), termino_planificado: dia(10, '18:00') }],
-  }));
+  const { status } = await call(
+    'POST',
+    '/turnos',
+    turno({
+      inicio_planificado: dia(10, '16:00'),
+      termino_planificado: dia(10, '22:00'),
+      viajes: [
+        {
+          recorrido_id: 1,
+          inicio_planificado: dia(10, '17:00'),
+          termino_planificado: dia(10, '18:00'),
+        },
+      ],
+    }),
+  );
   assert.equal(status, 201);
 });
 
 test('ADM-03: solo conductores habilitados', async () => {
-  const { status, body } = await call('POST', '/turnos', turno({ conductor_id: 4, vehiculo_id: 3 }));
+  const { status, body } = await call(
+    'POST',
+    '/turnos',
+    turno({ conductor_id: 4, vehiculo_id: 3 }),
+  );
   assert.equal(status, 409);
   assert.match(body.error.message, /habilitados/);
-  assert.equal((await call('POST', '/turnos', turno({ conductor_id: 5, vehiculo_id: 3 }))).status, 400); // es pasajero
+  assert.equal(
+    (await call('POST', '/turnos', turno({ conductor_id: 5, vehiculo_id: 3 }))).status,
+    400,
+  ); // es pasajero
 });
 
 test('ADM-03: solo vehículos operativos (con o sin observaciones)', async () => {
   const con = await call('POST', '/turnos', turno({ conductor_id: 3, vehiculo_id: 8 })); // con observaciones
   assert.equal(con.status, 201);
   for (const v of [9, 10]) {
-    const r = await call('POST', '/turnos', turno({ conductor_id: 3, vehiculo_id: v, inicio_planificado: dia(11, '08:00'), termino_planificado: dia(11, '16:00'),
-      viajes: [{ recorrido_id: 1, inicio_planificado: dia(11, '09:00'), termino_planificado: dia(11, '10:00') }] }));
+    const r = await call(
+      'POST',
+      '/turnos',
+      turno({
+        conductor_id: 3,
+        vehiculo_id: v,
+        inicio_planificado: dia(11, '08:00'),
+        termino_planificado: dia(11, '16:00'),
+        viajes: [
+          {
+            recorrido_id: 1,
+            inicio_planificado: dia(11, '09:00'),
+            termino_planificado: dia(11, '10:00'),
+          },
+        ],
+      }),
+    );
     assert.equal(r.status, 409);
   }
 });
@@ -100,20 +161,54 @@ test('ADM-03: solo vehículos operativos (con o sin observaciones)', async () =>
 test('ADM-03: validaciones de datos (fechas, viajes, líneas)', async () => {
   // día 20: libre de otros turnos, para que solo falle la validación que se prueba
   const d = (h) => dia(20, h);
-  const base20 = { conductor_id: 3, vehiculo_id: 4, inicio_planificado: d('08:00'), termino_planificado: d('16:00') };
-  const viaje = (rec, i, t) => ({ recorrido_id: rec, inicio_planificado: d(i), termino_planificado: d(t) });
+  const base20 = {
+    conductor_id: 3,
+    vehiculo_id: 4,
+    inicio_planificado: d('08:00'),
+    termino_planificado: d('16:00'),
+  };
+  const viaje = (rec, i, t) => ({
+    recorrido_id: rec,
+    inicio_planificado: d(i),
+    termino_planificado: d(t),
+  });
   const ok = [viaje(1, '09:00', '10:00')];
-  assert.equal((await call('POST', '/turnos', { ...base20, termino_planificado: d('07:00'), viajes: ok })).status, 400);
+  assert.equal(
+    (await call('POST', '/turnos', { ...base20, termino_planificado: d('07:00'), viajes: ok }))
+      .status,
+    400,
+  );
   assert.equal((await call('POST', '/turnos', { ...base20, viajes: [] })).status, 400);
-  assert.equal((await call('POST', '/turnos', { ...base20, viajes: [viaje(1, '06:00', '07:00')] })).status, 400); // fuera del turno
-  assert.equal((await call('POST', '/turnos', { ...base20, viajes: [viaje(1, '09:00', '10:00'), viaje(2, '09:30', '10:30')] })).status, 400); // superpuestos
-  assert.equal((await call('POST', '/turnos', { ...base20, viajes: [viaje(5, '09:00', '10:00')] })).status, 409); // línea 211 suspendida
-  assert.equal((await call('POST', '/turnos', { ...base20, inicio_planificado: 'mañana', viajes: ok })).status, 400);
+  assert.equal(
+    (await call('POST', '/turnos', { ...base20, viajes: [viaje(1, '06:00', '07:00')] })).status,
+    400,
+  ); // fuera del turno
+  assert.equal(
+    (
+      await call('POST', '/turnos', {
+        ...base20,
+        viajes: [viaje(1, '09:00', '10:00'), viaje(2, '09:30', '10:30')],
+      })
+    ).status,
+    400,
+  ); // superpuestos
+  assert.equal(
+    (await call('POST', '/turnos', { ...base20, viajes: [viaje(5, '09:00', '10:00')] })).status,
+    409,
+  ); // línea 211 suspendida
+  assert.equal(
+    (await call('POST', '/turnos', { ...base20, inicio_planificado: 'mañana', viajes: ok })).status,
+    400,
+  );
   assert.equal((await call('POST', '/turnos', { ...base20, viajes: ok })).status, 201); // y con datos correctos sí se crea
 });
 
 test('ADM-03: el error de validación indica qué campo falló', async () => {
-  const { status, body } = await call('POST', '/turnos', { ...turno(), conductor_id: 'abc', margen_tolerancia_min: -3 });
+  const { status, body } = await call('POST', '/turnos', {
+    ...turno(),
+    conductor_id: 'abc',
+    margen_tolerancia_min: -3,
+  });
   assert.equal(status, 400);
   assert.equal(body.error.code, 'VALIDACION');
   const campos = body.error.details.map((x) => x.campo);
@@ -122,13 +217,40 @@ test('ADM-03: el error de validación indica qué campo falló', async () => {
 });
 
 test('ADM-03: modifica un turno programado (sin chocar consigo mismo)', async () => {
-  const creado = await call('POST', '/turnos', turno({ conductor_id: 2, vehiculo_id: 5, inicio_planificado: dia(12, '08:00'), termino_planificado: dia(12, '12:00'),
-    viajes: [{ recorrido_id: 3, inicio_planificado: dia(12, '08:30'), termino_planificado: dia(12, '09:30') }] }));
+  const creado = await call(
+    'POST',
+    '/turnos',
+    turno({
+      conductor_id: 2,
+      vehiculo_id: 5,
+      inicio_planificado: dia(12, '08:00'),
+      termino_planificado: dia(12, '12:00'),
+      viajes: [
+        {
+          recorrido_id: 3,
+          inicio_planificado: dia(12, '08:30'),
+          termino_planificado: dia(12, '09:30'),
+        },
+      ],
+    }),
+  );
   const edit = await call('PUT', `/turnos/${creado.body.data.id}`, {
-    ...turno({ vehiculo_id: 5, inicio_planificado: dia(12, '08:00'), termino_planificado: dia(12, '14:00') }),
+    ...turno({
+      vehiculo_id: 5,
+      inicio_planificado: dia(12, '08:00'),
+      termino_planificado: dia(12, '14:00'),
+    }),
     viajes: [
-      { recorrido_id: 3, inicio_planificado: dia(12, '08:30'), termino_planificado: dia(12, '09:30') },
-      { recorrido_id: 4, inicio_planificado: dia(12, '10:00'), termino_planificado: dia(12, '11:00') },
+      {
+        recorrido_id: 3,
+        inicio_planificado: dia(12, '08:30'),
+        termino_planificado: dia(12, '09:30'),
+      },
+      {
+        recorrido_id: 4,
+        inicio_planificado: dia(12, '10:00'),
+        termino_planificado: dia(12, '11:00'),
+      },
     ],
   });
   assert.equal(edit.status, 200);
@@ -137,8 +259,23 @@ test('ADM-03: modifica un turno programado (sin chocar consigo mismo)', async ()
 });
 
 test('ADM-03: no se modifica un turno que ya empezó', async () => {
-  const t = await call('POST', '/turnos', turno({ conductor_id: 3, vehiculo_id: 6, inicio_planificado: dia(13, '08:00'), termino_planificado: dia(13, '12:00'),
-    viajes: [{ recorrido_id: 1, inicio_planificado: dia(13, '09:00'), termino_planificado: dia(13, '10:00') }] }));
+  const t = await call(
+    'POST',
+    '/turnos',
+    turno({
+      conductor_id: 3,
+      vehiculo_id: 6,
+      inicio_planificado: dia(13, '08:00'),
+      termino_planificado: dia(13, '12:00'),
+      viajes: [
+        {
+          recorrido_id: 1,
+          inicio_planificado: dia(13, '09:00'),
+          termino_planificado: dia(13, '10:00'),
+        },
+      ],
+    }),
+  );
   await models.Turno.update({ estado: 'en_curso' }, { where: { id: t.body.data.id } });
   assert.equal((await call('PUT', `/turnos/${t.body.data.id}`, turno())).status, 409);
 });
@@ -156,12 +293,24 @@ test('ADM-03: lista por fecha y conductor; turno inexistente da 404', async () =
 
 test('ADM-03: margen de tolerancia por defecto configurable; cada turno guarda el suyo', async () => {
   assert.equal((await call('GET', '/configuracion')).body.data.margen_tolerancia_min, 5);
-  assert.equal((await call('PUT', '/configuracion', { margen_tolerancia_min: 10 })).body.data.margen_tolerancia_min, 10);
+  assert.equal(
+    (await call('PUT', '/configuracion', { margen_tolerancia_min: 10 })).body.data
+      .margen_tolerancia_min,
+    10,
+  );
   assert.equal((await call('PUT', '/configuracion', { margen_tolerancia_min: -1 })).status, 400);
   assert.equal((await call('PUT', '/configuracion', { margen_tolerancia_min: 'a' })).status, 400);
 
-  const viajes = (d) => [{ recorrido_id: 1, inicio_planificado: dia(d, '09:00'), termino_planificado: dia(d, '10:00') }];
-  const base30 = (d) => ({ conductor_id: 2, vehiculo_id: 6, inicio_planificado: dia(d, '08:00'), termino_planificado: dia(d, '16:00'), viajes: viajes(d) });
+  const viajes = (d) => [
+    { recorrido_id: 1, inicio_planificado: dia(d, '09:00'), termino_planificado: dia(d, '10:00') },
+  ];
+  const base30 = (d) => ({
+    conductor_id: 2,
+    vehiculo_id: 6,
+    inicio_planificado: dia(d, '08:00'),
+    termino_planificado: dia(d, '16:00'),
+    viajes: viajes(d),
+  });
   // sin indicar margen → usa el valor por defecto actual (10)
   const a = await call('POST', '/turnos', base30(25));
   assert.equal(a.body.data.margen_tolerancia_min, 10);
@@ -170,5 +319,8 @@ test('ADM-03: margen de tolerancia por defecto configurable; cada turno guarda e
   assert.equal(b.body.data.margen_tolerancia_min, 2);
   // cambiar el valor por defecto no altera turnos ya creados
   await call('PUT', '/configuracion', { margen_tolerancia_min: 5 });
-  assert.equal((await call('GET', `/turnos/${a.body.data.id}`)).body.data.margen_tolerancia_min, 10);
+  assert.equal(
+    (await call('GET', `/turnos/${a.body.data.id}`)).body.data.margen_tolerancia_min,
+    10,
+  );
 });

@@ -40,21 +40,21 @@ Backend/
 
 Consultas públicas (no requieren sesión).
 
-| Método y ruta | Descripción |
-|---|---|
-| `GET /api/lineas?q=` | Líneas activas y suspendidas (las suspendidas traen `aviso`). `q` busca por código o nombre, sin distinguir mayúsculas ni tildes. |
-| `GET /api/lineas/:id` | Línea con sus recorridos (ida/vuelta), días, horarios y paraderos en orden. |
-| `GET /api/recorridos/:id` | Un recorrido con sus paraderos ordenados. |
-| `GET /api/paraderos?q=` | Paraderos activos con coordenadas. `q` busca por nombre o código. |
-| `GET /api/paraderos/:id` | Paradero y las líneas que pasan por él. |
+| Método y ruta             | Descripción                                                                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/lineas?q=`      | Líneas activas y suspendidas (las suspendidas traen `aviso`). `q` busca por código o nombre, sin distinguir mayúsculas ni tildes. |
+| `GET /api/lineas/:id`     | Línea con sus recorridos (ida/vuelta), días, horarios y paraderos en orden.                                                       |
+| `GET /api/recorridos/:id` | Un recorrido con sus paraderos ordenados.                                                                                         |
+| `GET /api/paraderos?q=`   | Paraderos activos con coordenadas. `q` busca por nombre o código.                                                                 |
+| `GET /api/paraderos/:id`  | Paradero y las líneas que pasan por él.                                                                                           |
 
 Las líneas desactivadas no se listan ni se pueden consultar (404). Un id inválido responde 400 con `{ "error": "..." }`.
 
 ## Scripts
 
-| Comando | Qué hace |
-|---|---|
-| `npm start` | Arranca el servidor |
-| `npm run dev` | Arranca con recarga automática |
+| Comando            | Qué hace                                    |
+| ------------------ | ------------------------------------------- |
+| `npm start`        | Arranca el servidor                         |
+| `npm run dev`      | Arranca con recarga automática              |
 | `npm run db:reset` | Borra y recrea la base con datos de ejemplo |
-| `npm test` | Ejecuta las pruebas automáticas |
+| `npm test`         | Ejecuta las pruebas automáticas             |

@@ -11,7 +11,8 @@ const { Sequelize, Transaction } = require('sequelize');
  * @param {string} [storage] ruta del archivo o ':memory:' (pruebas)
  */
 function createDatabase(storage = process.env.DB_PATH || './data/voybus.db') {
-  if (storage !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(storage)), { recursive: true });
+  if (storage !== ':memory:')
+    fs.mkdirSync(path.dirname(path.resolve(storage)), { recursive: true });
   return new Sequelize({
     dialect: 'sqlite',
     storage,

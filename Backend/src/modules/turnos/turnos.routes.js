@@ -12,10 +12,20 @@ function createTurnosRoutes(controller) {
   router.get('/turnos', soloAdmin, validar({ query: listarQuery }), controller.listar);
   router.get('/turnos/:id', soloAdmin, validar({ params: idParams }), controller.obtener);
   router.post('/turnos', soloAdmin, validar({ body: turnoBody }), controller.crear);
-  router.put('/turnos/:id', soloAdmin, validar({ params: idParams, body: turnoBody }), controller.modificar);
+  router.put(
+    '/turnos/:id',
+    soloAdmin,
+    validar({ params: idParams, body: turnoBody }),
+    controller.modificar,
+  );
 
   router.get('/configuracion', soloAdmin, controller.obtenerConfiguracion);
-  router.put('/configuracion', soloAdmin, validar({ body: configuracionBody }), controller.actualizarConfiguracion);
+  router.put(
+    '/configuracion',
+    soloAdmin,
+    validar({ body: configuracionBody }),
+    controller.actualizarConfiguracion,
+  );
 
   return router;
 }

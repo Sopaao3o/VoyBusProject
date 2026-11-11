@@ -55,17 +55,29 @@ test('RED-01: las líneas suspendidas se muestran con aviso', async () => {
 });
 
 test('RED-01: busca por nombre o código, sin importar mayúsculas ni tildes', async () => {
-  assert.deepEqual((await get('/lineas?q=COSTANERA')).body.data.map((l) => l.codigo), ['103']);
-  assert.deepEqual((await get('/lineas?q=107')).body.data.map((l) => l.codigo), ['107']);
+  assert.deepEqual(
+    (await get('/lineas?q=COSTANERA')).body.data.map((l) => l.codigo),
+    ['103'],
+  );
+  assert.deepEqual(
+    (await get('/lineas?q=107')).body.data.map((l) => l.codigo),
+    ['107'],
+  );
   assert.deepEqual((await get('/lineas?q=zzz')).body.data, []);
 });
 
 test('RED-01: la línea trae recorridos con días, horarios y paraderos en orden', async () => {
   const { data } = (await get('/lineas/1')).body;
-  assert.deepEqual(data.recorridos.map((r) => r.sentido), ['ida', 'vuelta']);
+  assert.deepEqual(
+    data.recorridos.map((r) => r.sentido),
+    ['ida', 'vuelta'],
+  );
   for (const r of data.recorridos) {
     assert.ok(r.dias_funcionamiento && r.horarios);
-    assert.deepEqual(r.paraderos.map((p) => p.orden), r.paraderos.map((_, i) => i + 1));
+    assert.deepEqual(
+      r.paraderos.map((p) => p.orden),
+      r.paraderos.map((_, i) => i + 1),
+    );
   }
   const ida = data.recorridos[0].paraderos.map((p) => p.codigo);
   const vuelta = data.recorridos[1].paraderos.map((p) => p.codigo);
@@ -89,12 +101,18 @@ test('RED-02: lista paraderos activos con coordenadas', async () => {
 });
 
 test('RED-02: busca por nombre sin tildes', async () => {
-  assert.deepEqual((await get('/paraderos?q=colon')).body.data.map((p) => p.codigo), ['PA-002']);
+  assert.deepEqual(
+    (await get('/paraderos?q=colon')).body.data.map((p) => p.codigo),
+    ['PA-002'],
+  );
 });
 
 test('RED-02: el paradero indica qué líneas pasan (sin desactivadas)', async () => {
   const { data } = (await get('/paraderos/2')).body;
-  assert.deepEqual(data.lineas.map((l) => l.codigo), ['107', '211']);
+  assert.deepEqual(
+    data.lineas.map((l) => l.codigo),
+    ['107', '211'],
+  );
 });
 
 test('RED-02: paradero inexistente o inactivo da error claro', async () => {

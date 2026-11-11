@@ -2,8 +2,18 @@
 const LINEAS = [
   { codigo: '103', nombre: 'Costanera – Universidad', color: '#1E5FC9', estado_servicio: 'activa' },
   { codigo: '107', nombre: 'Centro – Terminal Norte', color: '#3D9BE0', estado_servicio: 'activa' },
-  { codigo: '211', nombre: 'Sur – Zona Industrial', color: '#0F2A4A', estado_servicio: 'suspendida' },
-  { codigo: '305', nombre: 'Cerro – Plaza (fuera de operación)', color: '#5B6573', estado_servicio: 'desactivada' },
+  {
+    codigo: '211',
+    nombre: 'Sur – Zona Industrial',
+    color: '#0F2A4A',
+    estado_servicio: 'suspendida',
+  },
+  {
+    codigo: '305',
+    nombre: 'Cerro – Plaza (fuera de operación)',
+    color: '#5B6573',
+    estado_servicio: 'desactivada',
+  },
 ];
 
 const PARADEROS = [
@@ -24,25 +34,70 @@ const PARADEROS = [
 
 // código de línea -> paraderos de la ida en orden (la vuelta es el mismo orden al revés)
 const RECORRIDOS = {
-  '103': { ida: ['PA-001', 'PA-003', 'PA-004', 'PA-007', 'PA-005'], dias: 'Lunes a domingo', horarios: '06:00 - 23:00, cada 10 min' },
-  '107': { ida: ['PA-002', 'PA-001', 'PA-012', 'PA-004', 'PA-009'], dias: 'Lunes a sábado', horarios: '06:30 - 22:00, cada 15 min' },
-  '211': { ida: ['PA-002', 'PA-008', 'PA-006', 'PA-011', 'PA-010'], dias: 'Lunes a viernes', horarios: '07:00 - 20:00, cada 20 min' },
-  '305': { ida: ['PA-002', 'PA-012', 'PA-013'], dias: 'Lunes a viernes', horarios: '08:00 - 18:00, cada 30 min' },
+  103: {
+    ida: ['PA-001', 'PA-003', 'PA-004', 'PA-007', 'PA-005'],
+    dias: 'Lunes a domingo',
+    horarios: '06:00 - 23:00, cada 10 min',
+  },
+  107: {
+    ida: ['PA-002', 'PA-001', 'PA-012', 'PA-004', 'PA-009'],
+    dias: 'Lunes a sábado',
+    horarios: '06:30 - 22:00, cada 15 min',
+  },
+  211: {
+    ida: ['PA-002', 'PA-008', 'PA-006', 'PA-011', 'PA-010'],
+    dias: 'Lunes a viernes',
+    horarios: '07:00 - 20:00, cada 20 min',
+  },
+  305: {
+    ida: ['PA-002', 'PA-012', 'PA-013'],
+    dias: 'Lunes a viernes',
+    horarios: '08:00 - 18:00, cada 30 min',
+  },
 };
 
 // Usuarios de demostración. password_hash queda vacío: el login lo implementa Daslav.
 const USUARIOS = [
   { rol: 'administrador', nombre_visible: 'Admin VoyBus', alias: 'admin', estado: 'habilitado' },
-  { rol: 'conductor', nombre_visible: 'Carlos Rojas', alias: 'crojas', estado: 'habilitado', identificador: 'COND-001' },
-  { rol: 'conductor', nombre_visible: 'María Soto', alias: 'msoto', estado: 'habilitado', identificador: 'COND-002' },
-  { rol: 'conductor', nombre_visible: 'Luis Pérez', alias: 'lperez', estado: 'deshabilitado', identificador: 'COND-003' },
+  {
+    rol: 'conductor',
+    nombre_visible: 'Carlos Rojas',
+    alias: 'crojas',
+    estado: 'habilitado',
+    identificador: 'COND-001',
+  },
+  {
+    rol: 'conductor',
+    nombre_visible: 'María Soto',
+    alias: 'msoto',
+    estado: 'habilitado',
+    identificador: 'COND-002',
+  },
+  {
+    rol: 'conductor',
+    nombre_visible: 'Luis Pérez',
+    alias: 'lperez',
+    estado: 'deshabilitado',
+    identificador: 'COND-003',
+  },
   { rol: 'pasajero', nombre_visible: 'Ana Pasajera', alias: 'ana', estado: 'habilitado' },
 ];
 
-const ESTADOS_VEHICULO = { 8: 'operativo_con_observaciones', 9: 'en_mantenimiento', 10: 'fuera_de_servicio' };
+const ESTADOS_VEHICULO = {
+  8: 'operativo_con_observaciones',
+  9: 'en_mantenimiento',
+  10: 'fuera_de_servicio',
+};
 
 /** Carga los datos de ejemplo. Pensado para una base recién migrada. */
-async function cargarDatosEjemplo({ Usuario, Linea, Recorrido, Paradero, RecorridoParadero, Vehiculo }) {
+async function cargarDatosEjemplo({
+  Usuario,
+  Linea,
+  Recorrido,
+  Paradero,
+  RecorridoParadero,
+  Vehiculo,
+}) {
   const lineaId = {};
   for (const l of LINEAS) lineaId[l.codigo] = (await Linea.create(l)).id;
 
@@ -61,7 +116,11 @@ async function cargarDatosEjemplo({ Usuario, Linea, Recorrido, Paradero, Recorri
         horarios: r.horarios,
       });
       await RecorridoParadero.bulkCreate(
-        paradas.map((p, i) => ({ recorrido_id: recorrido.id, orden: i + 1, paradero_id: paraderoId[p] })),
+        paradas.map((p, i) => ({
+          recorrido_id: recorrido.id,
+          orden: i + 1,
+          paradero_id: paraderoId[p],
+        })),
       );
     }
   }

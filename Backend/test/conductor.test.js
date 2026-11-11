@@ -9,7 +9,9 @@ const { cargarDatosEjemplo } = require('../src/database/seeders/datos-ejemplo');
 
 let server, base, sequelize, models;
 let reloj = new Date('2026-12-01T08:00:00Z'); // hora "actual" controlada por las pruebas
-const poner = (iso) => { reloj = new Date(iso); };
+const poner = (iso) => {
+  reloj = new Date(iso);
+};
 
 test.before(async () => {
   sequelize = createDatabase(':memory:');
@@ -39,7 +41,10 @@ const call = async (method, path, { as = 2, body } = {}) => {
 /** Crea un turno de prueba directamente en la base, con dos viajes. */
 async function crearTurno({ conductor = 2, vehiculo = 1, dia = '2026-12-01', margen = 5 } = {}) {
   // Cierra turnos que otras pruebas dejaron en curso, para que no interfieran con esta.
-  await models.Turno.update({ estado: 'finalizado' }, { where: { conductor_id: conductor, estado: 'en_curso' } });
+  await models.Turno.update(
+    { estado: 'finalizado' },
+    { where: { conductor_id: conductor, estado: 'en_curso' } },
+  );
   const t = await models.Turno.create({
     conductor_id: conductor,
     vehiculo_id: vehiculo,
@@ -47,8 +52,20 @@ async function crearTurno({ conductor = 2, vehiculo = 1, dia = '2026-12-01', mar
     termino_planificado: `${dia}T16:00:00.000Z`,
     margen_tolerancia_min: margen,
   });
-  const v1 = await models.Viaje.create({ turno_id: t.id, recorrido_id: 1, orden_en_turno: 1, inicio_planificado: `${dia}T08:30:00.000Z`, termino_planificado: `${dia}T10:00:00.000Z` });
-  const v2 = await models.Viaje.create({ turno_id: t.id, recorrido_id: 2, orden_en_turno: 2, inicio_planificado: `${dia}T10:30:00.000Z`, termino_planificado: `${dia}T12:00:00.000Z` });
+  const v1 = await models.Viaje.create({
+    turno_id: t.id,
+    recorrido_id: 1,
+    orden_en_turno: 1,
+    inicio_planificado: `${dia}T08:30:00.000Z`,
+    termino_planificado: `${dia}T10:00:00.000Z`,
+  });
+  const v2 = await models.Viaje.create({
+    turno_id: t.id,
+    recorrido_id: 2,
+    orden_en_turno: 2,
+    inicio_planificado: `${dia}T10:30:00.000Z`,
+    termino_planificado: `${dia}T12:00:00.000Z`,
+  });
   return { turno: t.id, viajes: [v1.id, v2.id] };
 }
 
@@ -58,7 +75,10 @@ test('VEH-03: el conductor ve solo sus turnos, con vehículo y recorridos', asyn
   const mio = await crearTurno({ conductor: 2, dia: '2026-12-02', vehiculo: 1 });
   const ajeno = await crearTurno({ conductor: 3, dia: '2026-12-02', vehiculo: 2 });
   const lista = await call('GET', '/conductor/turnos?fecha=2026-12-02');
-  assert.deepEqual(lista.body.data.map((t) => t.id), [mio.turno]);
+  assert.deepEqual(
+    lista.body.data.map((t) => t.id),
+    [mio.turno],
+  );
   assert.equal(lista.body.data[0].vehiculo.identificador, 'BUS-01');
   assert.equal(lista.body.data[0].viajes.length, 2);
   assert.equal(lista.body.data[0].viajes[0].linea_codigo, '103');
@@ -103,9 +123,18 @@ test('VEH-03: no se puede iniciar un turno dos veces ni tener dos en curso', asy
   const a = await crearTurno({ dia: '2026-12-04', vehiculo: 4 });
   const b = await crearTurno({ dia: '2026-12-05', vehiculo: 4 });
   // (crearTurno cierra turnos en curso del conductor; por eso primero se crean ambos y luego se inicia)
-  assert.equal((await call('POST', `/conductor/turnos/${a.turno}/iniciar`, { body: ok })).status, 200);
-  assert.equal((await call('POST', `/conductor/turnos/${a.turno}/iniciar`, { body: ok })).status, 409);
-  assert.equal((await call('POST', `/conductor/turnos/${b.turno}/iniciar`, { body: ok })).status, 409);
+  assert.equal(
+    (await call('POST', `/conductor/turnos/${a.turno}/iniciar`, { body: ok })).status,
+    200,
+  );
+  assert.equal(
+    (await call('POST', `/conductor/turnos/${a.turno}/iniciar`, { body: ok })).status,
+    409,
+  );
+  assert.equal(
+    (await call('POST', `/conductor/turnos/${b.turno}/iniciar`, { body: ok })).status,
+    409,
+  );
 });
 
 test('VEH-03: los viajes se hacen en orden y solo con el turno en curso', async () => {
@@ -114,18 +143,28 @@ test('VEH-03: los viajes se hacen en orden y solo con el turno en curso', async 
   await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: ok });
   assert.equal((await call('POST', `/conductor/viajes/${viajes[1]}/iniciar`)).status, 409); // falta el viaje 1
   assert.equal((await call('POST', `/conductor/viajes/${viajes[0]}/iniciar`)).status, 200);
-  assert.equal((await call('POST', `/conductor/turnos/${turno}/finalizar`, { body: ok })).status, 409); // viaje en curso
+  assert.equal(
+    (await call('POST', `/conductor/turnos/${turno}/finalizar`, { body: ok })).status,
+    409,
+  ); // viaje en curso
 });
 
 test('VEH-03: estado con observaciones o fuera de servicio exige describir el problema', async () => {
   const { turno } = await crearTurno({ dia: '2026-12-07', vehiculo: 6 });
-  const sin = await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: { estado_vehiculo: 'operativo_con_observaciones' } });
+  const sin = await call('POST', `/conductor/turnos/${turno}/iniciar`, {
+    body: { estado_vehiculo: 'operativo_con_observaciones' },
+  });
   assert.equal(sin.status, 400);
   assert.equal(sin.body.error.details[0].campo, 'body.descripcion');
-  const mal = await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: { estado_vehiculo: 'en_mantenimiento', descripcion: 'x' } });
+  const mal = await call('POST', `/conductor/turnos/${turno}/iniciar`, {
+    body: { estado_vehiculo: 'en_mantenimiento', descripcion: 'x' },
+  });
   assert.equal(mal.status, 400); // el conductor no puede declarar mantenimiento
   const bien = await call('POST', `/conductor/turnos/${turno}/iniciar`, {
-    body: { estado_vehiculo: 'operativo_con_observaciones', descripcion: 'Luz trasera izquierda no funciona' },
+    body: {
+      estado_vehiculo: 'operativo_con_observaciones',
+      descripcion: 'Luz trasera izquierda no funciona',
+    },
   });
   assert.equal(bien.status, 200);
   assert.equal(bien.body.data.vehiculo.estado_operativo, 'operativo_con_observaciones');
@@ -157,13 +196,36 @@ test('VEH-03: los cambios de estado conservan fecha, responsable y observación'
 
 test('VEH-03: incidencias del vehículo o del recorrido quedan disponibles para el administrador', async () => {
   const { turno } = await crearTurno({ dia: '2026-12-09', vehiculo: 2 });
-  assert.equal((await call('POST', `/conductor/turnos/${turno}/incidencias`, { body: { tipo: 'vehiculo', descripcion: 'x' } })).status, 409); // turno sin iniciar
+  assert.equal(
+    (
+      await call('POST', `/conductor/turnos/${turno}/incidencias`, {
+        body: { tipo: 'vehiculo', descripcion: 'x' },
+      })
+    ).status,
+    409,
+  ); // turno sin iniciar
   await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: ok });
   poner('2026-12-09T09:15:00Z');
-  const inc = await call('POST', `/conductor/turnos/${turno}/incidencias`, { body: { tipo: 'recorrido', descripcion: 'Calle cortada por obras' } });
+  const inc = await call('POST', `/conductor/turnos/${turno}/incidencias`, {
+    body: { tipo: 'recorrido', descripcion: 'Calle cortada por obras' },
+  });
   assert.equal(inc.status, 201);
-  assert.equal((await call('POST', `/conductor/turnos/${turno}/incidencias`, { body: { tipo: 'otra', descripcion: 'x' } })).status, 400);
-  assert.equal((await call('POST', `/conductor/turnos/${turno}/incidencias`, { body: { tipo: 'vehiculo', descripcion: '  ' } })).status, 400);
+  assert.equal(
+    (
+      await call('POST', `/conductor/turnos/${turno}/incidencias`, {
+        body: { tipo: 'otra', descripcion: 'x' },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await call('POST', `/conductor/turnos/${turno}/incidencias`, {
+        body: { tipo: 'vehiculo', descripcion: '  ' },
+      })
+    ).status,
+    400,
+  );
   const lista = await call('GET', `/admin/incidencias?turno_id=${turno}`, { as: 1 });
   assert.equal(lista.body.data.length, 1);
   assert.equal(lista.body.data[0].conductor_nombre, 'Carlos Rojas');
@@ -174,11 +236,17 @@ test('VEH-03: incidencias del vehículo o del recorrido quedan disponibles para 
 test('VEH-03: atrasos y términos anticipados según el margen; la justificación conserva las horas', async () => {
   const { turno, viajes } = await crearTurno({ dia: '2026-12-10', vehiculo: 8, conductor: 3 });
   poner('2026-12-10T08:12:00Z'); // 12 min tarde (margen 5)
-  const ini = await call('POST', `/conductor/turnos/${turno}/iniciar`, { as: 3, body: { estado_vehiculo: 'operativo_con_observaciones', descripcion: 'Espejo suelto' } });
+  const ini = await call('POST', `/conductor/turnos/${turno}/iniciar`, {
+    as: 3,
+    body: { estado_vehiculo: 'operativo_con_observaciones', descripcion: 'Espejo suelto' },
+  });
   assert.equal(ini.body.data.evaluacion.inicio.estado, 'atraso');
   assert.equal(ini.body.data.evaluacion.inicio.minutos, 12);
 
-  const just = await call('PUT', `/conductor/turnos/${turno}/justificacion`, { as: 3, body: { justificacion: 'Tráfico en acceso al terminal' } });
+  const just = await call('PUT', `/conductor/turnos/${turno}/justificacion`, {
+    as: 3,
+    body: { justificacion: 'Tráfico en acceso al terminal' },
+  });
   assert.equal(just.body.data.justificacion_atraso, 'Tráfico en acceso al terminal');
   assert.equal(just.body.data.inicio_planificado, '2026-12-10T08:00:00.000Z'); // hora original intacta
   assert.equal(just.body.data.inicio_real, '2026-12-10T08:12:00.000Z');
@@ -189,15 +257,33 @@ test('VEH-03: atrasos y términos anticipados según el margen; la justificació
   const f = await call('POST', `/conductor/viajes/${viajes[0]}/finalizar`, { as: 3 });
   assert.equal(f.body.data.viajes[0].evaluacion.termino.estado, 'termino_anticipado');
   assert.equal(f.body.data.viajes[0].evaluacion.inicio.estado, 'a_tiempo');
-  assert.equal((await call('PUT', `/conductor/viajes/${viajes[0]}/justificacion`, { as: 3, body: { justificacion: 'Menos pasajeros' } })).status, 200);
-  assert.equal((await call('PUT', `/conductor/viajes/${viajes[0]}/justificacion`, { as: 3, body: { justificacion: '' } })).status, 400);
+  assert.equal(
+    (
+      await call('PUT', `/conductor/viajes/${viajes[0]}/justificacion`, {
+        as: 3,
+        body: { justificacion: 'Menos pasajeros' },
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await call('PUT', `/conductor/viajes/${viajes[0]}/justificacion`, {
+        as: 3,
+        body: { justificacion: '' },
+      })
+    ).status,
+    400,
+  );
 });
 
 test('VEH-03: no se justifica lo que no tiene desviación; cada turno usa su propio margen', async () => {
   const { turno } = await crearTurno({ dia: '2026-12-11', vehiculo: 3, conductor: 2, margen: 5 });
   poner('2026-12-11T08:03:00Z');
   await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: ok });
-  const r = await call('PUT', `/conductor/turnos/${turno}/justificacion`, { body: { justificacion: 'Sin motivo' } });
+  const r = await call('PUT', `/conductor/turnos/${turno}/justificacion`, {
+    body: { justificacion: 'Sin motivo' },
+  });
   assert.equal(r.status, 409); // 3 min está dentro del margen de 5
 
   // El mismo atraso de 3 minutos, en un turno con margen de 1, sí cuenta como atraso
@@ -211,5 +297,8 @@ test('VEH-03: no se justifica lo que no tiene desviación; cada turno usa su pro
 test('VEH-03: no se puede iniciar un turno con vehículo en mantenimiento', async () => {
   const { turno } = await crearTurno({ dia: '2026-12-12', vehiculo: 10 });
   await models.Vehiculo.update({ estado_operativo: 'en_mantenimiento' }, { where: { id: 10 } });
-  assert.equal((await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: ok })).status, 409);
+  assert.equal(
+    (await call('POST', `/conductor/turnos/${turno}/iniciar`, { body: ok })).status,
+    409,
+  );
 });

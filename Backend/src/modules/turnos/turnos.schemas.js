@@ -31,7 +31,9 @@ const turnoBody = z
     inicio_planificado: fecha,
     termino_planificado: fecha,
     margen_tolerancia_min: margen.optional(),
-    viajes: z.array(viaje, { error: 'Los viajes deben ser una lista' }).min(1, 'El turno debe incluir al menos un viaje'),
+    viajes: z
+      .array(viaje, { error: 'Los viajes deben ser una lista' })
+      .min(1, 'El turno debe incluir al menos un viaje'),
   })
   .superRefine((t, ctx) => {
     const problema = (message, path) => ctx.addIssue({ code: 'custom', message, path });
@@ -40,13 +42,26 @@ const turnoBody = z
     }
     t.viajes.forEach((v, i) => {
       if (v.termino_planificado <= v.inicio_planificado) {
-        problema('El término del viaje debe ser posterior a su inicio', ['viajes', i, 'termino_planificado']);
+        problema('El término del viaje debe ser posterior a su inicio', [
+          'viajes',
+          i,
+          'termino_planificado',
+        ]);
       }
-      if (v.inicio_planificado < t.inicio_planificado || v.termino_planificado > t.termino_planificado) {
-        problema('El viaje debe quedar dentro del horario del turno', ['viajes', i, 'inicio_planificado']);
+      if (
+        v.inicio_planificado < t.inicio_planificado ||
+        v.termino_planificado > t.termino_planificado
+      ) {
+        problema('El viaje debe quedar dentro del horario del turno', [
+          'viajes',
+          i,
+          'inicio_planificado',
+        ]);
       }
     });
-    const porHora = [...t.viajes].sort((a, b) => a.inicio_planificado.localeCompare(b.inicio_planificado));
+    const porHora = [...t.viajes].sort((a, b) =>
+      a.inicio_planificado.localeCompare(b.inicio_planificado),
+    );
     for (let i = 1; i < porHora.length; i++) {
       if (porHora[i].inicio_planificado < porHora[i - 1].termino_planificado) {
         problema('Los viajes de un turno no pueden superponerse', ['viajes']);
@@ -61,7 +76,10 @@ const turnoBody = z
   }));
 
 const listarQuery = z.object({
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD').optional(),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato AAAA-MM-DD')
+    .optional(),
   conductor_id: z.coerce.number().int().positive().optional(),
 });
 

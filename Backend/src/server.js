@@ -17,9 +17,13 @@ async function iniciar() {
   if ((await models.Linea.count()) === 0) await cargarDatosEjemplo(models);
 
   // 0.0.0.0 permite que el celular (misma red Wi-Fi) llegue al servidor del PC.
-  createApp({ models, registro: true, simulador: process.env.NODE_ENV !== 'production' }).listen(PORT, '0.0.0.0', () => {
-    console.log(`VoyBus backend escuchando en http://localhost:${PORT}`);
-  });
+  createApp({ models, registro: true, simulador: process.env.NODE_ENV !== 'production' }).listen(
+    PORT,
+    '0.0.0.0',
+    () => {
+      console.log(`VoyBus backend escuchando en http://localhost:${PORT}`);
+    },
+  );
 }
 
 iniciar().catch((err) => {

@@ -3,7 +3,11 @@
  * Lo usan el administrador (ADM-03) y el conductor (VEH-03).
  * Con una sola conexión SQLite, dentro de una transacción hay que pasar `{ transaction }`.
  */
-async function turnoCompleto({ Turno, Usuario, Vehiculo, Viaje, Recorrido, Linea }, id, opciones = {}) {
+async function turnoCompleto(
+  { Turno, Usuario, Vehiculo, Viaje, Recorrido, Linea },
+  id,
+  opciones = {},
+) {
   const turno = await Turno.findByPk(id, {
     include: [
       { model: Usuario, as: 'conductor' },
@@ -24,7 +28,11 @@ async function turnoCompleto({ Turno, Usuario, Vehiculo, Viaje, Recorrido, Linea
     ...datos,
     conductor_nombre: conductor.nombre_visible,
     vehiculo_identificador: vehiculo.identificador,
-    vehiculo: { identificador: vehiculo.identificador, patente: vehiculo.patente, estado_operativo: vehiculo.estado_operativo },
+    vehiculo: {
+      identificador: vehiculo.identificador,
+      patente: vehiculo.patente,
+      estado_operativo: vehiculo.estado_operativo,
+    },
     viajes: viajes.map((v) => {
       const { recorrido, ...viaje } = v.get({ plain: true });
       return {

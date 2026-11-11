@@ -22,7 +22,12 @@ function validar(esquemas) {
       }
     }
     if (detalles.length > 0) {
-      return next(new HttpError(400, 'Los datos enviados no son válidos', { code: 'VALIDACION', details: detalles }));
+      return next(
+        new HttpError(400, 'Los datos enviados no son válidos', {
+          code: 'VALIDACION',
+          details: detalles,
+        }),
+      );
     }
     req.datos = datos;
     next();

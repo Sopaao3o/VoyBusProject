@@ -11,14 +11,27 @@ const { evaluar } = require('./evaluacion');
  * @param {{ ahora?: () => Date }} [opciones] `ahora` permite controlar el reloj en las pruebas
  */
 function createConductorService(models, { ahora = () => new Date() } = {}) {
-  const { sequelize, Usuario, Vehiculo, Turno, Viaje, Incidencia, HistorialEstadoVehiculo, SolicitudParada, Paradero, RecorridoParadero } = models;
+  const {
+    sequelize,
+    Usuario,
+    Vehiculo,
+    Turno,
+    Viaje,
+    Incidencia,
+    HistorialEstadoVehiculo,
+    SolicitudParada,
+    Paradero,
+    RecorridoParadero,
+  } = models;
   const ahoraISO = () => ahora().toISOString();
 
   /** Comprueba que quien consulta es un conductor habilitado. */
   async function exigirConductor(id, transaction) {
     const u = await Usuario.findByPk(id, { transaction });
-    if (!u || u.rol !== 'conductor') throw new HttpError(403, 'Esta acción es solo para conductores');
-    if (u.estado !== 'habilitado') throw new HttpError(403, 'Tu cuenta de conductor no está habilitada');
+    if (!u || u.rol !== 'conductor')
+      throw new HttpError(403, 'Esta acción es solo para conductores');
+    if (u.estado !== 'habilitado')
+      throw new HttpError(403, 'Tu cuenta de conductor no está habilitada');
     return u;
   }
 
@@ -88,8 +101,14 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const where = { conductor_id: conductorId };
-        const turnos = await Turno.findAll({ where, order: [['inicio_planificado', 'ASC']], transaction });
-        const delDia = fecha ? turnos.filter((t) => t.inicio_planificado.startsWith(fecha)) : turnos;
+        const turnos = await Turno.findAll({
+          where,
+          order: [['inicio_planificado', 'ASC']],
+          transaction,
+        });
+        const delDia = fecha
+          ? turnos.filter((t) => t.inicio_planificado.startsWith(fecha))
+          : turnos;
         return Promise.all(delDia.map((t) => detalle(t.id, transaction)));
       });
     },
@@ -107,13 +126,24 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
         await exigirConductor(conductorId, transaction);
         const turno = await turnoPropio(conductorId, turnoId, transaction);
         if (turno.estado !== 'programado') throw conflict('El turno ya fue iniciado o finalizado');
-        const otro = await Turno.findOne({ where: { conductor_id: conductorId, estado: 'en_curso' }, transaction });
+        const otro = await Turno.findOne({
+          where: { conductor_id: conductorId, estado: 'en_curso' },
+          transaction,
+        });
         if (otro) throw conflict('Ya tienes un turno en curso; finalízalo antes de iniciar otro');
         const vehiculo = await Vehiculo.findByPk(turno.vehiculo_id, { transaction });
         if (!vehiculo.habilitado || vehiculo.estado_operativo === 'en_mantenimiento') {
-          throw conflict('El vehículo no está disponible (mantenimiento o deshabilitado). Contacta al administrador');
+          throw conflict(
+            'El vehículo no está disponible (mantenimiento o deshabilitado). Contacta al administrador',
+          );
         }
-        await cambiarEstadoVehiculo(turno.vehiculo_id, conductorId, estadoVehiculo, descripcion, transaction);
+        await cambiarEstadoVehiculo(
+          turno.vehiculo_id,
+          conductorId,
+          estadoVehiculo,
+          descripcion,
+          transaction,
+        );
         await turno.update(
           { estado: 'en_curso', inicio_real: ahoraISO(), estado_vehiculo_recibido: estadoVehiculo },
           { transaction },
@@ -126,13 +156,26 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const turno = await turnoPropio(conductorId, turnoId, transaction);
-        if (turno.estado !== 'en_curso') throw conflict('Solo se puede finalizar un turno en curso');
-        if (await Viaje.findOne({ where: { turno_id: turnoId, estado: 'en_curso' }, transaction })) {
+        if (turno.estado !== 'en_curso')
+          throw conflict('Solo se puede finalizar un turno en curso');
+        if (
+          await Viaje.findOne({ where: { turno_id: turnoId, estado: 'en_curso' }, transaction })
+        ) {
           throw conflict('Hay un viaje en curso; finalízalo antes de cerrar el turno');
         }
-        await cambiarEstadoVehiculo(turno.vehiculo_id, conductorId, estadoVehiculo, descripcion, transaction);
+        await cambiarEstadoVehiculo(
+          turno.vehiculo_id,
+          conductorId,
+          estadoVehiculo,
+          descripcion,
+          transaction,
+        );
         await turno.update(
-          { estado: 'finalizado', termino_real: ahoraISO(), estado_vehiculo_entregado: estadoVehiculo },
+          {
+            estado: 'finalizado',
+            termino_real: ahoraISO(),
+            estado_vehiculo_entregado: estadoVehiculo,
+          },
           { transaction },
         );
         return detalle(turnoId, transaction);
@@ -149,9 +192,16 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
         if (['fuera_de_servicio', 'en_mantenimiento'].includes(vehiculo.estado_operativo)) {
           throw conflict('Un vehículo fuera de servicio no puede iniciar nuevos viajes');
         }
-        const anteriores = await Viaje.findAll({ where: { turno_id: turno.id }, order: [['orden_en_turno', 'ASC']], transaction });
-        const pendiente = anteriores.find((v) => v.orden_en_turno < viaje.orden_en_turno && v.estado !== 'finalizado');
-        if (pendiente) throw conflict(`Primero debes finalizar el viaje ${pendiente.orden_en_turno}`);
+        const anteriores = await Viaje.findAll({
+          where: { turno_id: turno.id },
+          order: [['orden_en_turno', 'ASC']],
+          transaction,
+        });
+        const pendiente = anteriores.find(
+          (v) => v.orden_en_turno < viaje.orden_en_turno && v.estado !== 'finalizado',
+        );
+        if (pendiente)
+          throw conflict(`Primero debes finalizar el viaje ${pendiente.orden_en_turno}`);
         await viaje.update({ estado: 'en_curso', inicio_real: ahoraISO() }, { transaction });
         return detalle(turno.id, transaction);
       });
@@ -161,7 +211,8 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const { viaje, turno } = await viajePropio(conductorId, viajeId, transaction);
-        if (viaje.estado !== 'en_curso') throw conflict('Solo se puede finalizar un viaje en curso');
+        if (viaje.estado !== 'en_curso')
+          throw conflict('Solo se puede finalizar un viaje en curso');
         // Finalizar un viaje NO cierra el turno (el turno puede tener más viajes).
         await viaje.update({ estado: 'finalizado', termino_real: ahoraISO() }, { transaction });
         // Las solicitudes de parada que quedaban abiertas se cierran con el motivo del fin del viaje.
@@ -177,8 +228,15 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const turno = await turnoPropio(conductorId, turnoId, transaction);
-        if (turno.estado !== 'en_curso') throw conflict('Solo se puede informar el estado durante un turno en curso');
-        await cambiarEstadoVehiculo(turno.vehiculo_id, conductorId, estadoVehiculo, descripcion, transaction);
+        if (turno.estado !== 'en_curso')
+          throw conflict('Solo se puede informar el estado durante un turno en curso');
+        await cambiarEstadoVehiculo(
+          turno.vehiculo_id,
+          conductorId,
+          estadoVehiculo,
+          descripcion,
+          transaction,
+        );
         return detalle(turnoId, transaction);
       });
     },
@@ -187,9 +245,17 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const turno = await turnoPropio(conductorId, turnoId, transaction);
-        if (turno.estado !== 'en_curso') throw conflict('Solo se pueden registrar incidencias durante un turno en curso');
+        if (turno.estado !== 'en_curso')
+          throw conflict('Solo se pueden registrar incidencias durante un turno en curso');
         const incidencia = await Incidencia.create(
-          { conductor_id: conductorId, vehiculo_id: turno.vehiculo_id, turno_id: turnoId, tipo, descripcion, fecha: ahoraISO() },
+          {
+            conductor_id: conductorId,
+            vehiculo_id: turno.vehiculo_id,
+            turno_id: turnoId,
+            tipo,
+            descripcion,
+            fecha: ahoraISO(),
+          },
           { transaction },
         );
         return incidencia.get({ plain: true });
@@ -223,21 +289,36 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
             { model: Usuario, as: 'pasajero' },
             { model: Paradero, as: 'paradero' },
           ],
-          order: [['creada_en', 'ASC'], ['id', 'ASC']],
+          order: [
+            ['creada_en', 'ASC'],
+            ['id', 'ASC'],
+          ],
           transaction,
         });
-        const paradas = await RecorridoParadero.findAll({ where: { recorrido_id: viaje.recorrido_id }, transaction });
+        const paradas = await RecorridoParadero.findAll({
+          where: { recorrido_id: viaje.recorrido_id },
+          transaction,
+        });
         const ordenDe = new Map(paradas.map((p) => [p.paradero_id, p.orden]));
 
         const grupos = new Map();
         for (const s of solicitudes) {
           if (!grupos.has(s.paradero_id)) {
             const { id, codigo, nombre } = s.paradero;
-            grupos.set(s.paradero_id, { paradero: { id, codigo, nombre, orden: ordenDe.get(id) }, total: 0, solicitudes: [] });
+            grupos.set(s.paradero_id, {
+              paradero: { id, codigo, nombre, orden: ordenDe.get(id) },
+              total: 0,
+              solicitudes: [],
+            });
           }
           const grupo = grupos.get(s.paradero_id);
           grupo.total++;
-          grupo.solicitudes.push({ id: s.id, pasajero_nombre: s.pasajero.nombre_visible, estado: s.estado, creada_en: s.creada_en });
+          grupo.solicitudes.push({
+            id: s.id,
+            pasajero_nombre: s.pasajero.nombre_visible,
+            estado: s.estado,
+            creada_en: s.creada_en,
+          });
         }
         return [...grupos.values()].sort((a, b) => a.paradero.orden - b.paradero.orden);
       });
@@ -254,11 +335,18 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
           { model: Usuario, as: 'conductor' },
           { model: Vehiculo, as: 'vehiculo' },
         ],
-        order: [['fecha', 'DESC'], ['id', 'DESC']],
+        order: [
+          ['fecha', 'DESC'],
+          ['id', 'DESC'],
+        ],
       });
       return filas.map((i) => {
         const { conductor, vehiculo, ...datos } = i.get({ plain: true });
-        return { ...datos, conductor_nombre: conductor.nombre_visible, vehiculo_identificador: vehiculo.identificador };
+        return {
+          ...datos,
+          conductor_nombre: conductor.nombre_visible,
+          vehiculo_identificador: vehiculo.identificador,
+        };
       });
     },
 
@@ -267,7 +355,10 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       const filas = await HistorialEstadoVehiculo.findAll({
         where: { vehiculo_id: vehiculoId },
         include: [{ model: Usuario, as: 'responsable' }],
-        order: [['fecha', 'DESC'], ['id', 'DESC']],
+        order: [
+          ['fecha', 'DESC'],
+          ['id', 'DESC'],
+        ],
       });
       return filas.map((h) => {
         const { responsable, ...datos } = h.get({ plain: true });

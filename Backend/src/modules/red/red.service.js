@@ -16,12 +16,24 @@ function normalizar(texto) {
 const noEncontrado = (mensaje) => new HttpError(404, mensaje);
 
 function lineaPublica(l) {
-  const out = { id: l.id, codigo: l.codigo, nombre: l.nombre, color: l.color, estado_servicio: l.estado_servicio };
+  const out = {
+    id: l.id,
+    codigo: l.codigo,
+    nombre: l.nombre,
+    color: l.color,
+    estado_servicio: l.estado_servicio,
+  };
   if (l.estado_servicio === 'suspendida') out.aviso = AVISO_SUSPENDIDA;
   return out;
 }
 
-const paraderoPublico = (p) => ({ id: p.id, codigo: p.codigo, nombre: p.nombre, latitud: p.latitud, longitud: p.longitud });
+const paraderoPublico = (p) => ({
+  id: p.id,
+  codigo: p.codigo,
+  nombre: p.nombre,
+  latitud: p.latitud,
+  longitud: p.longitud,
+});
 
 /** @param {ReturnType<import('../../database/models').initModels>} models */
 function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
@@ -51,14 +63,20 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
       const term = normalizar(q);
       const lineas = await Linea.findAll({ where: lineaVisible, order: [['codigo', 'ASC']] });
       return lineas
-        .filter((l) => !term || normalizar(l.codigo).includes(term) || normalizar(l.nombre).includes(term))
+        .filter(
+          (l) =>
+            !term || normalizar(l.codigo).includes(term) || normalizar(l.nombre).includes(term),
+        )
         .map(lineaPublica);
     },
 
     async obtenerLinea(id) {
       const linea = await Linea.findOne({ where: { id, ...lineaVisible } });
       if (!linea) throw noEncontrado('La línea no existe o no está disponible');
-      const recorridos = await Recorrido.findAll({ where: { linea_id: id, activo: 1 }, order: [['sentido', 'ASC']] });
+      const recorridos = await Recorrido.findAll({
+        where: { linea_id: id, activo: 1 },
+        order: [['sentido', 'ASC']],
+      });
       return { ...lineaPublica(linea), recorridos: await recorridosConParadas(recorridos) };
     },
 
@@ -72,7 +90,12 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
       const { linea } = recorrido;
       const out = {
         ...completo,
-        linea: { id: linea.id, codigo: linea.codigo, nombre: linea.nombre, estado_servicio: linea.estado_servicio },
+        linea: {
+          id: linea.id,
+          codigo: linea.codigo,
+          nombre: linea.nombre,
+          estado_servicio: linea.estado_servicio,
+        },
       };
       if (linea.estado_servicio === 'suspendida') out.aviso = AVISO_SUSPENDIDA;
       return out;
@@ -80,9 +103,15 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
 
     async listarParaderos(q) {
       const term = normalizar(q);
-      const paraderos = await Paradero.findAll({ where: { activo: 1 }, order: [['nombre', 'ASC']] });
+      const paraderos = await Paradero.findAll({
+        where: { activo: 1 },
+        order: [['nombre', 'ASC']],
+      });
       return paraderos
-        .filter((p) => !term || normalizar(p.nombre).includes(term) || normalizar(p.codigo).includes(term))
+        .filter(
+          (p) =>
+            !term || normalizar(p.nombre).includes(term) || normalizar(p.codigo).includes(term),
+        )
         .map(paraderoPublico);
     },
 
@@ -104,7 +133,9 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
       for (const p of paradas) lineas.set(p.recorrido.linea.id, p.recorrido.linea);
       return {
         ...paraderoPublico(paradero),
-        lineas: [...lineas.values()].sort((a, b) => a.codigo.localeCompare(b.codigo)).map(lineaPublica),
+        lineas: [...lineas.values()]
+          .sort((a, b) => a.codigo.localeCompare(b.codigo))
+          .map(lineaPublica),
       };
     },
   };

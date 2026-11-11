@@ -3,8 +3,7 @@
 // solo hay que reemplazar el cuerpo de estas dos funciones; las rutas ya las usan y no se tocan.
 const { HttpError } = require('../utils/httpErrors');
 
-function requireRole(...roles) {
-  // eslint-disable-next-line no-unused-vars
+function requireRole(..._roles) {
   return (req, res, next) => {
     // TODO(auth): validar la sesión y que el rol del usuario esté en `roles`.
     next();

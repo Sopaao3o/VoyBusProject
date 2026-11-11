@@ -12,7 +12,8 @@ async function main() {
   const file = process.env.DB_PATH || './data/voybus.db';
   const reset = process.argv.includes('--reset');
   if (reset) {
-    for (const sufijo of ['', '-wal', '-shm']) fs.rmSync(path.resolve(file + sufijo), { force: true });
+    for (const sufijo of ['', '-wal', '-shm'])
+      fs.rmSync(path.resolve(file + sufijo), { force: true });
   }
   const sequelize = createDatabase(file);
   await sequelize.query('PRAGMA journal_mode = WAL;');

@@ -12,7 +12,10 @@ const { createTurnosController } = require('./modules/turnos/turnos.controller')
 const { createTurnosRoutes } = require('./modules/turnos/turnos.routes');
 const { createConductorService } = require('./modules/conductor/conductor.service');
 const { createConductorController } = require('./modules/conductor/conductor.controller');
-const { createConductorRoutes, createConductorAdminRoutes } = require('./modules/conductor/conductor.routes');
+const {
+  createConductorRoutes,
+  createConductorAdminRoutes,
+} = require('./modules/conductor/conductor.routes');
 const { createViajesService } = require('./modules/viajes/viajes.service');
 const { createViajesController } = require('./modules/viajes/viajes.controller');
 const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/viajes.routes');

@@ -12,8 +12,10 @@ function createTurnosService(models) {
   /** Reglas que necesitan consultar la base. (Las de formato ya las revisó Zod.) */
   async function validarReglas(d, excluirId, transaction) {
     const conductor = await Usuario.findByPk(d.conductor_id, { transaction });
-    if (!conductor || conductor.rol !== 'conductor') throw badRequest('El conductor indicado no existe');
-    if (conductor.estado !== 'habilitado') throw conflict('Solo se pueden asignar conductores habilitados');
+    if (!conductor || conductor.rol !== 'conductor')
+      throw badRequest('El conductor indicado no existe');
+    if (conductor.estado !== 'habilitado')
+      throw conflict('Solo se pueden asignar conductores habilitados');
 
     const vehiculo = await Vehiculo.findByPk(d.vehiculo_id, { transaction });
     if (!vehiculo) throw badRequest('El vehículo indicado no existe');
@@ -40,9 +42,13 @@ function createTurnosService(models) {
     }
 
     for (const [i, v] of d.viajes.entries()) {
-      const recorrido = await Recorrido.findByPk(v.recorrido_id, { include: [{ model: Linea, as: 'linea' }], transaction });
+      const recorrido = await Recorrido.findByPk(v.recorrido_id, {
+        include: [{ model: Linea, as: 'linea' }],
+        transaction,
+      });
       if (!recorrido || !recorrido.activo) throw badRequest(`viajes[${i}]: el recorrido no existe`);
-      if (recorrido.linea.estado_servicio !== 'activa') throw conflict(`viajes[${i}]: la línea no está activa`);
+      if (recorrido.linea.estado_servicio !== 'activa')
+        throw conflict(`viajes[${i}]: la línea no está activa`);
     }
   }
 
@@ -57,7 +63,9 @@ function createTurnosService(models) {
       return sequelize.transaction(async (transaction) => {
         await validarReglas(datos, 0, transaction);
         // Cada turno guarda su propio margen; si no se indica, se usa el valor por defecto del sistema.
-        const margen = datos.margen_tolerancia_min ?? (await Configuracion.findByPk(1, { transaction })).margen_tolerancia_min;
+        const margen =
+          datos.margen_tolerancia_min ??
+          (await Configuracion.findByPk(1, { transaction })).margen_tolerancia_min;
         const turno = await Turno.create(
           {
             conductor_id: datos.conductor_id,
@@ -77,7 +85,8 @@ function createTurnosService(models) {
       return sequelize.transaction(async (transaction) => {
         const turno = await Turno.findByPk(id, { transaction });
         if (!turno) throw notFound('El turno no existe');
-        if (turno.estado !== 'programado') throw conflict('Solo se pueden modificar turnos que aún no han comenzado');
+        if (turno.estado !== 'programado')
+          throw conflict('Solo se pueden modificar turnos que aún no han comenzado');
         await validarReglas(datos, id, transaction);
         await turno.update(
           {

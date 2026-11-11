@@ -9,7 +9,11 @@ const idParams = z.object({
 });
 
 const busquedaQuery = z.object({
-  q: z.string({ error: 'La búsqueda debe ser un texto' }).trim().max(60, 'La búsqueda admite hasta 60 caracteres').optional(),
+  q: z
+    .string({ error: 'La búsqueda debe ser un texto' })
+    .trim()
+    .max(60, 'La búsqueda admite hasta 60 caracteres')
+    .optional(),
 });
 
 module.exports = { idParams, busquedaQuery };

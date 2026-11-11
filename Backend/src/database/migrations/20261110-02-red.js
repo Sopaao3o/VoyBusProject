@@ -37,5 +37,10 @@ module.exports = {
       )`,
     ]),
   down: (qi) =>
-    ejecutar(qi, ['DROP TABLE recorrido_paraderos', 'DROP TABLE paraderos', 'DROP TABLE recorridos', 'DROP TABLE lineas']),
+    ejecutar(qi, [
+      'DROP TABLE recorrido_paraderos',
+      'DROP TABLE paraderos',
+      'DROP TABLE recorridos',
+      'DROP TABLE lineas',
+    ]),
 };

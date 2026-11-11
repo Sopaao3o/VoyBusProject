@@ -11,7 +11,12 @@ function createViajesRoutes(c) {
   const params = validar({ params: idParams });
 
   router.get('/:id/paraderos-disponibles', soloPasajero, params, c.paraderosDisponibles);
-  router.post('/:id/solicitudes-parada', soloPasajero, validar({ params: idParams, body: solicitudBody }), c.solicitarParada);
+  router.post(
+    '/:id/solicitudes-parada',
+    soloPasajero,
+    validar({ params: idParams, body: solicitudBody }),
+    c.solicitarParada,
+  );
   router.get('/:id/solicitudes-parada/mia', soloPasajero, params, c.miSolicitud);
 
   return router;
