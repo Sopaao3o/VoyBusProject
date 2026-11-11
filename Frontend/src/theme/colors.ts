@@ -9,4 +9,6 @@ export const colors = {
   textMuted: '#5B6573',
   border: '#D5DEEA',
   onSecondary: '#0F2A4A',
+  warning: '#B26A00',
+  warningBg: '#FFF4DB',
 };

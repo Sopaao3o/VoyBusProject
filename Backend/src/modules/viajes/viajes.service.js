@@ -19,6 +19,8 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     Recorrido,
     Linea,
     Viaje,
+    Turno,
+    Vehiculo,
     RecorridoParadero,
     SolicitudParada,
     UbicacionVehiculo,
@@ -193,6 +195,29 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         if (!viaje) throw notFound('El viaje no existe');
         return ultimaSolicitud(pasajeroId, viaje, transaction);
       });
+    },
+
+    /**
+     * SIMULADOR (solo desarrollo): viajes en curso, para elegir uno mientras no exista
+     * la vinculación del pasajero por QR (VIA-01).
+     */
+    async viajesEnCurso() {
+      const viajes = await Viaje.findAll({
+        where: { estado: 'en_curso' },
+        include: [
+          { model: Recorrido, as: 'recorrido', include: [{ model: Linea, as: 'linea' }] },
+          { model: Turno, as: 'turno', include: [{ model: Vehiculo, as: 'vehiculo' }] },
+        ],
+        order: [['id', 'ASC']],
+      });
+      return viajes.map((v) => ({
+        id: v.id,
+        linea_codigo: v.recorrido.linea.codigo,
+        linea_nombre: v.recorrido.linea.nombre,
+        sentido: v.recorrido.sentido,
+        vehiculo_identificador: v.turno.vehiculo.identificador,
+        ultimo_orden_superado: v.ultimo_orden_superado,
+      }));
     },
 
     /**

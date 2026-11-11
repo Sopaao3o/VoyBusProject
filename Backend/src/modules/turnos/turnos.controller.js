@@ -11,13 +11,25 @@ function createTurnosController(service) {
       res.status(201).json({ data: await service.crear(req.datos.body) });
     },
     modificar: async (req, res) => {
-      res.json({ data: await service.modificar(req.datos.params.id, req.datos.body) });
+      res.json({
+        data: await service.modificar(req.datos.params.id, req.datos.body),
+      });
+    },
+    listarConductores: async (req, res) => {
+      const data = await service.listarConductores();
+      res.json({ data, meta: { total: data.length } });
+    },
+    listarVehiculos: async (req, res) => {
+      const data = await service.listarVehiculos();
+      res.json({ data, meta: { total: data.length } });
     },
     obtenerConfiguracion: async (req, res) => {
       res.json({ data: await service.obtenerConfiguracion() });
     },
     actualizarConfiguracion: async (req, res) => {
-      res.json({ data: await service.actualizarMargen(req.datos.body.margen_tolerancia_min) });
+      res.json({
+        data: await service.actualizarMargen(req.datos.body.margen_tolerancia_min),
+      });
     },
   };
 }

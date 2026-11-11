@@ -25,6 +25,7 @@ function createViajesRoutes(c) {
 /** Herramienta de desarrollo: se monta en /api/v1/simulador solo si se activa. */
 function createSimuladorRoutes(c) {
   const router = Router();
+  router.get('/viajes-en-curso', c.listarViajesEnCurso);
   router.post('/viajes/:id/avanzar', validar({ params: idParams }), c.simularAvance);
   return router;
 }

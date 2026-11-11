@@ -235,3 +235,16 @@ test('VIA-02: el simulador se detiene en el último paradero y solo existe si se
   sinSimulador.close();
   assert.equal(res.status, 404);
 });
+
+test('VIA-02: el simulador lista los viajes en curso para poder elegir uno', async () => {
+  const v = await viajeEnCurso({ conductor: 3, vehiculo: 2 });
+  const programado = await viajeEnCurso({ conductor: 2, vehiculo: 3, estado: 'programado' });
+  const { status, body } = await call('GET', '/simulador/viajes-en-curso', { as: null });
+  assert.equal(status, 200);
+  const mio = body.data.find((x) => x.id === v);
+  assert.equal(mio.linea_codigo, '103');
+  assert.equal(mio.sentido, 'ida');
+  assert.equal(mio.vehiculo_identificador, 'BUS-02');
+  assert.equal(mio.ultimo_orden_superado, 0);
+  assert.ok(!body.data.some((x) => x.id === programado)); // solo los que están en curso
+});
