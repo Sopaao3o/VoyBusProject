@@ -7,6 +7,7 @@ import { colors } from '../../src/theme/colors';
 export default function TabsLayout() {
   const { usuario } = useUsuario();
   const esAdmin = usuario.rol === 'administrador';
+  const esConductor = usuario.rol === 'conductor';
 
   return (
     <Tabs
@@ -43,6 +44,17 @@ export default function TabsLayout() {
           href: esAdmin ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
+      {/* VEH-03: solo el conductor ve esta pestaña. */}
+      <Tabs.Screen
+        name="mis-turnos"
+        options={{
+          title: 'Mis turnos',
+          href: esConductor ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="clipboard-outline" color={color as string} size={size} />
           ),
         }}
       />

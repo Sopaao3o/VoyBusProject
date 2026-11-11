@@ -68,6 +68,9 @@ export interface ViajeDeTurno {
   linea_codigo: string;
   linea_nombre: string;
   estado: string;
+  inicio_real?: string | null;
+  termino_real?: string | null;
+  justificacion_atraso?: string | null;
 }
 
 export interface TurnoDetalle extends TurnoResumen {
@@ -108,4 +111,46 @@ export interface TurnoNuevo {
 export interface Configuracion {
   margen_tolerancia_min: number;
   actualizado_en: string | null;
+}
+
+// ───── VEH-03: vista del conductor ─────
+
+export type EstadoPuntualidad = 'a_tiempo' | 'atraso' | 'termino_anticipado';
+
+export interface Puntualidad {
+  minutos: number;
+  estado: EstadoPuntualidad;
+}
+
+export interface EvaluacionHoras {
+  inicio: Puntualidad | null;
+  termino: Puntualidad | null;
+}
+
+export type EstadoVehiculo =
+  'operativo' | 'operativo_con_observaciones' | 'en_mantenimiento' | 'fuera_de_servicio';
+
+export interface ViajeConductor extends ViajeDeTurno {
+  evaluacion: EvaluacionHoras;
+}
+
+export interface TurnoConductor extends Omit<TurnoDetalle, 'viajes'> {
+  inicio_real: string | null;
+  termino_real: string | null;
+  justificacion_atraso: string | null;
+  estado_vehiculo_recibido: EstadoVehiculo | null;
+  estado_vehiculo_entregado: EstadoVehiculo | null;
+  evaluacion: EvaluacionHoras;
+  viajes: ViajeConductor[];
+}
+
+export interface EstadoVehiculoBody {
+  estado_vehiculo: 'operativo' | 'operativo_con_observaciones' | 'fuera_de_servicio';
+  descripcion?: string;
+}
+
+export interface GrupoSolicitudes {
+  paradero: { id: number; codigo: string; nombre: string; orden: number };
+  total: number;
+  solicitudes: { id: number; pasajero_nombre: string; estado: string; creada_en: string }[];
 }
