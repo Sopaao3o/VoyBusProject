@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero' }} />
         <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
         <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
+        <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
         <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
         <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />
       </Stack>

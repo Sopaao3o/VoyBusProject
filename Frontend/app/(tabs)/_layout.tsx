@@ -8,6 +8,7 @@ export default function TabsLayout() {
   const { usuario } = useUsuario();
   const esAdmin = usuario.rol === 'administrador';
   const esConductor = usuario.rol === 'conductor';
+  const esPasajero = usuario.rol === 'pasajero';
 
   return (
     <Tabs
@@ -33,6 +34,17 @@ export default function TabsLayout() {
           title: 'Paraderos',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="location-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
+      {/* VIA-02: solo el pasajero ve esta pestaña. */}
+      <Tabs.Screen
+        name="viajar"
+        options={{
+          title: 'Viajar',
+          href: esPasajero ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="navigate-outline" color={color as string} size={size} />
           ),
         }}
       />

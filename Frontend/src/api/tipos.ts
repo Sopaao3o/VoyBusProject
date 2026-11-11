@@ -154,3 +154,40 @@ export interface GrupoSolicitudes {
   total: number;
   solicitudes: { id: number; pasajero_nombre: string; estado: string; creada_en: string }[];
 }
+
+// ───── VIA-02: pasajero ─────
+
+export interface ViajeEnCurso {
+  id: number;
+  linea_codigo: string;
+  linea_nombre: string;
+  sentido: 'ida' | 'vuelta';
+  vehiculo_identificador: string;
+  ultimo_orden_superado: number;
+}
+
+export type EstadoSolicitud = 'enviada' | 'proxima' | 'cerrada';
+
+export interface SolicitudParada {
+  id: number;
+  viaje_id: number;
+  estado: EstadoSolicitud;
+  motivo_cierre: 'paradero_superado' | 'viaje_finalizado' | null;
+  motivo_cierre_texto: string | null;
+  creada_en: string;
+  cerrada_en: string | null;
+  paradero: { id: number; codigo: string; nombre: string; orden: number | null };
+}
+
+export interface ParaderosDisponibles {
+  viaje: {
+    id: number;
+    estado: string;
+    sentido: 'ida' | 'vuelta';
+    linea_codigo: string;
+    linea_nombre: string;
+    ultimo_orden_superado: number;
+  };
+  paraderos: ParaderoDeRecorrido[];
+  mi_solicitud: SolicitudParada | null;
+}
