@@ -1,4 +1,5 @@
 // VEH-03: cumplimiento de turnos y registro del estado del vehículo (vista del conductor).
+const { Op } = require('sequelize');
 const { notFound, conflict, HttpError } = require('../../utils/httpErrors');
 const { turnoCompleto } = require('../turnos/turno-detalle');
 const { evaluar } = require('./evaluacion');
@@ -10,7 +11,7 @@ const { evaluar } = require('./evaluacion');
  * @param {{ ahora?: () => Date }} [opciones] `ahora` permite controlar el reloj en las pruebas
  */
 function createConductorService(models, { ahora = () => new Date() } = {}) {
-  const { sequelize, Usuario, Vehiculo, Turno, Viaje, Incidencia, HistorialEstadoVehiculo } = models;
+  const { sequelize, Usuario, Vehiculo, Turno, Viaje, Incidencia, HistorialEstadoVehiculo, SolicitudParada, Paradero, RecorridoParadero } = models;
   const ahoraISO = () => ahora().toISOString();
 
   /** Comprueba que quien consulta es un conductor habilitado. */
@@ -163,6 +164,11 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
         if (viaje.estado !== 'en_curso') throw conflict('Solo se puede finalizar un viaje en curso');
         // Finalizar un viaje NO cierra el turno (el turno puede tener más viajes).
         await viaje.update({ estado: 'finalizado', termino_real: ahoraISO() }, { transaction });
+        // Las solicitudes de parada que quedaban abiertas se cierran con el motivo del fin del viaje.
+        await SolicitudParada.update(
+          { estado: 'cerrada', motivo_cierre: 'viaje_finalizado', cerrada_en: ahoraISO() },
+          { where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } }, transaction },
+        );
         return detalle(turno.id, transaction);
       });
     },
@@ -203,6 +209,37 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
         await exigirConductor(conductorId, transaction);
         const { viaje, turno } = await viajePropio(conductorId, viajeId, transaction);
         return justificar(viaje, turno.id, justificacion, transaction);
+      });
+    },
+
+    /** Solicitudes de parada abiertas de un viaje, agrupadas por paradero (cada registro se conserva). */
+    async solicitudesDeParada(conductorId, viajeId) {
+      return sequelize.transaction(async (transaction) => {
+        await exigirConductor(conductorId, transaction);
+        const { viaje } = await viajePropio(conductorId, viajeId, transaction);
+        const solicitudes = await SolicitudParada.findAll({
+          where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } },
+          include: [
+            { model: Usuario, as: 'pasajero' },
+            { model: Paradero, as: 'paradero' },
+          ],
+          order: [['creada_en', 'ASC'], ['id', 'ASC']],
+          transaction,
+        });
+        const paradas = await RecorridoParadero.findAll({ where: { recorrido_id: viaje.recorrido_id }, transaction });
+        const ordenDe = new Map(paradas.map((p) => [p.paradero_id, p.orden]));
+
+        const grupos = new Map();
+        for (const s of solicitudes) {
+          if (!grupos.has(s.paradero_id)) {
+            const { id, codigo, nombre } = s.paradero;
+            grupos.set(s.paradero_id, { paradero: { id, codigo, nombre, orden: ordenDe.get(id) }, total: 0, solicitudes: [] });
+          }
+          const grupo = grupos.get(s.paradero_id);
+          grupo.total++;
+          grupo.solicitudes.push({ id: s.id, pasajero_nombre: s.pasajero.nombre_visible, estado: s.estado, creada_en: s.creada_en });
+        }
+        return [...grupos.values()].sort((a, b) => a.paradero.orden - b.paradero.orden);
       });
     },
 

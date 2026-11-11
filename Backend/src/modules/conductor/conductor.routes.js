@@ -20,6 +20,7 @@ function createConductorRoutes(c) {
 
   router.post('/viajes/:id/iniciar', soloConductor, params, c.iniciarViaje);
   router.post('/viajes/:id/finalizar', soloConductor, params, c.finalizarViaje);
+  router.get('/viajes/:id/solicitudes-parada', soloConductor, params, c.solicitudesDeParada);
   router.put('/viajes/:id/justificacion', soloConductor, validar({ params: idParams, body: justificacionBody }), c.justificarViaje);
 
   return router;

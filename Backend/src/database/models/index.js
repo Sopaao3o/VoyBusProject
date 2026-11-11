@@ -10,6 +10,8 @@ const definirViaje = require('./viaje');
 const definirIncidencia = require('./incidencia');
 const definirHistorialEstadoVehiculo = require('./historial-estado-vehiculo');
 const definirConfiguracion = require('./configuracion');
+const definirSolicitudParada = require('./solicitud-parada');
+const definirUbicacionVehiculo = require('./ubicacion-vehiculo');
 
 /** @param {import('sequelize').Sequelize} sequelize */
 function initModels(sequelize) {
@@ -24,6 +26,8 @@ function initModels(sequelize) {
   const Incidencia = definirIncidencia(sequelize);
   const HistorialEstadoVehiculo = definirHistorialEstadoVehiculo(sequelize);
   const Configuracion = definirConfiguracion(sequelize);
+  const SolicitudParada = definirSolicitudParada(sequelize);
+  const UbicacionVehiculo = definirUbicacionVehiculo(sequelize);
 
   // Una línea tiene recorridos (ida y vuelta)
   Linea.hasMany(Recorrido, { foreignKey: 'linea_id', as: 'recorridos' });
@@ -48,6 +52,11 @@ function initModels(sequelize) {
   HistorialEstadoVehiculo.belongsTo(Usuario, { foreignKey: 'responsable_id', as: 'responsable' });
   HistorialEstadoVehiculo.belongsTo(Vehiculo, { foreignKey: 'vehiculo_id', as: 'vehiculo' });
 
+  // Solicitudes de parada de los pasajeros dentro de un viaje
+  SolicitudParada.belongsTo(Viaje, { foreignKey: 'viaje_id', as: 'viaje' });
+  SolicitudParada.belongsTo(Usuario, { foreignKey: 'pasajero_id', as: 'pasajero' });
+  SolicitudParada.belongsTo(Paradero, { foreignKey: 'paradero_id', as: 'paradero' });
+
   return {
     sequelize,
     Usuario,
@@ -61,6 +70,8 @@ function initModels(sequelize) {
     Incidencia,
     HistorialEstadoVehiculo,
     Configuracion,
+    SolicitudParada,
+    UbicacionVehiculo,
   };
 }
 

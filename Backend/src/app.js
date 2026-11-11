@@ -13,14 +13,18 @@ const { createTurnosRoutes } = require('./modules/turnos/turnos.routes');
 const { createConductorService } = require('./modules/conductor/conductor.service');
 const { createConductorController } = require('./modules/conductor/conductor.controller');
 const { createConductorRoutes, createConductorAdminRoutes } = require('./modules/conductor/conductor.routes');
+const { createViajesService } = require('./modules/viajes/viajes.service');
+const { createViajesController } = require('./modules/viajes/viajes.controller');
+const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/viajes.routes');
 
 /**
  * @param {object} deps
  * @param {ReturnType<import('./database/models').initModels>} deps.models modelos Sequelize
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
+ * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
  */
-function createApp({ models, registro = false, ahora }) {
+function createApp({ models, registro = false, ahora, simulador = false }) {
   const app = express();
 
   app.use(cors());
@@ -35,6 +39,9 @@ function createApp({ models, registro = false, ahora }) {
   v1.use('/admin', createTurnosRoutes(createTurnosController(createTurnosService(models))));
   v1.use('/admin', createConductorAdminRoutes(conductor));
   v1.use('/conductor', createConductorRoutes(conductor));
+  const viajes = createViajesController(createViajesService(models, { ahora }));
+  v1.use('/viajes', createViajesRoutes(viajes));
+  if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));
   app.use('/api/v1', v1);
 
   app.use((req, res) => {

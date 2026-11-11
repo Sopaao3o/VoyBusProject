@@ -27,6 +27,10 @@ function createConductorController(service) {
       const historial = await service.historialVehiculo(req.datos.params.id);
       res.json({ data: historial, meta: { total: historial.length } });
     },
+    solicitudesDeParada: async (req, res) => {
+      const grupos = await service.solicitudesDeParada(yo(req), req.datos.params.id);
+      res.json({ data: grupos, meta: { total_paraderos: grupos.length, total_solicitudes: grupos.reduce((n, g) => n + g.total, 0) } });
+    },
   };
 }
 
