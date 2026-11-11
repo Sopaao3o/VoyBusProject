@@ -174,13 +174,23 @@ test('ADM-03: validaciones de datos (fechas, viajes, líneas)', async () => {
   });
   const ok = [viaje(1, '09:00', '10:00')];
   assert.equal(
-    (await call('POST', '/turnos', { ...base20, termino_planificado: d('07:00'), viajes: ok }))
-      .status,
+    (
+      await call('POST', '/turnos', {
+        ...base20,
+        termino_planificado: d('07:00'),
+        viajes: ok,
+      })
+    ).status,
     400,
   );
   assert.equal((await call('POST', '/turnos', { ...base20, viajes: [] })).status, 400);
   assert.equal(
-    (await call('POST', '/turnos', { ...base20, viajes: [viaje(1, '06:00', '07:00')] })).status,
+    (
+      await call('POST', '/turnos', {
+        ...base20,
+        viajes: [viaje(1, '06:00', '07:00')],
+      })
+    ).status,
     400,
   ); // fuera del turno
   assert.equal(
@@ -193,11 +203,22 @@ test('ADM-03: validaciones de datos (fechas, viajes, líneas)', async () => {
     400,
   ); // superpuestos
   assert.equal(
-    (await call('POST', '/turnos', { ...base20, viajes: [viaje(5, '09:00', '10:00')] })).status,
+    (
+      await call('POST', '/turnos', {
+        ...base20,
+        viajes: [viaje(5, '09:00', '10:00')],
+      })
+    ).status,
     409,
   ); // línea 211 suspendida
   assert.equal(
-    (await call('POST', '/turnos', { ...base20, inicio_planificado: 'mañana', viajes: ok })).status,
+    (
+      await call('POST', '/turnos', {
+        ...base20,
+        inicio_planificado: 'mañana',
+        viajes: ok,
+      })
+    ).status,
     400,
   );
   assert.equal((await call('POST', '/turnos', { ...base20, viajes: ok })).status, 201); // y con datos correctos sí se crea
@@ -302,7 +323,11 @@ test('ADM-03: margen de tolerancia por defecto configurable; cada turno guarda e
   assert.equal((await call('PUT', '/configuracion', { margen_tolerancia_min: 'a' })).status, 400);
 
   const viajes = (d) => [
-    { recorrido_id: 1, inicio_planificado: dia(d, '09:00'), termino_planificado: dia(d, '10:00') },
+    {
+      recorrido_id: 1,
+      inicio_planificado: dia(d, '09:00'),
+      termino_planificado: dia(d, '10:00'),
+    },
   ];
   const base30 = (d) => ({
     conductor_id: 2,
@@ -315,7 +340,10 @@ test('ADM-03: margen de tolerancia por defecto configurable; cada turno guarda e
   const a = await call('POST', '/turnos', base30(25));
   assert.equal(a.body.data.margen_tolerancia_min, 10);
   // indicando margen → usa el del turno
-  const b = await call('POST', '/turnos', { ...base30(26), margen_tolerancia_min: 2 });
+  const b = await call('POST', '/turnos', {
+    ...base30(26),
+    margen_tolerancia_min: 2,
+  });
   assert.equal(b.body.data.margen_tolerancia_min, 2);
   // cambiar el valor por defecto no altera turnos ya creados
   await call('PUT', '/configuracion', { margen_tolerancia_min: 5 });
@@ -323,4 +351,22 @@ test('ADM-03: margen de tolerancia por defecto configurable; cada turno guarda e
     (await call('GET', `/turnos/${a.body.data.id}`)).body.data.margen_tolerancia_min,
     10,
   );
+});
+
+test('ADM-03: el administrador lista conductores y vehículos para asignar turnos', async () => {
+  const c = await call('GET', '/conductores');
+  assert.equal(c.status, 200);
+  assert.equal(c.body.meta.total, 3);
+  const luis = c.body.data.find((x) => x.nombre === 'Luis Pérez');
+  assert.equal(luis.habilitado, false);
+  assert.equal(c.body.data.find((x) => x.nombre === 'Carlos Rojas').habilitado, true);
+
+  const v = await call('GET', '/vehiculos');
+  assert.equal(v.status, 200);
+  assert.equal(v.body.meta.total, 10);
+  const porId = (identificador) => v.body.data.find((x) => x.identificador === identificador);
+  assert.equal(porId('BUS-01').asignable, true);
+  assert.equal(porId('BUS-08').asignable, true); // operativo con observaciones
+  assert.equal(porId('BUS-09').asignable, false); // en mantenimiento
+  assert.equal(porId('BUS-10').asignable, false); // fuera de servicio
 });

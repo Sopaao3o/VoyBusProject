@@ -54,7 +54,11 @@ function createTurnosService(models) {
 
   const guardarViajes = (turnoId, viajes, transaction) =>
     Viaje.bulkCreate(
-      viajes.map((v, i) => ({ turno_id: turnoId, orden_en_turno: i + 1, ...v })),
+      viajes.map((v, i) => ({
+        turno_id: turnoId,
+        orden_en_turno: i + 1,
+        ...v,
+      })),
       { transaction },
     );
 
@@ -135,15 +139,49 @@ function createTurnosService(models) {
       }));
     },
 
+    /** Conductores para asignar turnos (los deshabilitados se indican, no se ocultan). */
+    async listarConductores() {
+      const conductores = await Usuario.findAll({
+        where: { rol: 'conductor' },
+        order: [['nombre_visible', 'ASC']],
+      });
+      return conductores.map((c) => ({
+        id: c.id,
+        nombre: c.nombre_visible,
+        habilitado: c.estado === 'habilitado',
+      }));
+    },
+
+    /** Vehículos para asignar turnos; `asignable` indica si hoy se puede usar en un turno. */
+    async listarVehiculos() {
+      const vehiculos = await Vehiculo.findAll({
+        order: [['identificador', 'ASC']],
+      });
+      return vehiculos.map((v) => ({
+        id: v.id,
+        identificador: v.identificador,
+        patente: v.patente,
+        capacidad: v.capacidad,
+        estado_operativo: v.estado_operativo,
+        asignable: Boolean(v.habilitado) && VEHICULO_ASIGNABLE.includes(v.estado_operativo),
+      }));
+    },
+
     async obtenerConfiguracion() {
       const c = await Configuracion.findByPk(1);
-      return { margen_tolerancia_min: c.margen_tolerancia_min, actualizado_en: c.actualizado_en };
+      return {
+        margen_tolerancia_min: c.margen_tolerancia_min,
+        actualizado_en: c.actualizado_en,
+      };
     },
 
     /** Cambia el margen por defecto. Solo afecta a los turnos que se creen desde ahora. */
     async actualizarMargen(valor) {
       await Configuracion.update(
-        { margen_tolerancia_min: valor, actualizado_en: new Date().toISOString() },
+        {
+          margen_tolerancia_min: valor,
+          actualizado_en: new Date().toISOString(),
+        },
         { where: { id: 1 } },
       );
       return this.obtenerConfiguracion();

@@ -19,6 +19,9 @@ function createTurnosRoutes(controller) {
     controller.modificar,
   );
 
+  router.get('/conductores', soloAdmin, controller.listarConductores);
+  router.get('/vehiculos', soloAdmin, controller.listarVehiculos);
+
   router.get('/configuracion', soloAdmin, controller.obtenerConfiguracion);
   router.put(
     '/configuracion',
