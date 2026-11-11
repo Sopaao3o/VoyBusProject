@@ -141,3 +141,36 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+expo-env.d.ts
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+android/app/build/
+android/.gradle/
+ios/Pods/
+ios/build/
+
+# Base de datos local (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor / sistema operativo
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# SQLite en modo WAL (archivos auxiliares de la base de datos)
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
