@@ -13,6 +13,10 @@ function createViajesController(service) {
     miSolicitud: async (req, res) => {
       res.json({ data: await service.miSolicitud(yo(req), req.datos.params.id) });
     },
+    listarViajesEnCurso: async (req, res) => {
+      const data = await service.viajesEnCurso();
+      res.json({ data, meta: { total: data.length } });
+    },
     simularAvance: async (req, res) => {
       res.json({ data: await service.simularAvance(req.datos.params.id) });
     },
