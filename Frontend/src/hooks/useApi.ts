@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ApiError } from '../api/client';
+import { textoDeError } from '../api/client';
 
 /** Ejecuta una consulta a la API y entrega { datos, cargando, error, recargar }. */
 export function useApi<T>(consulta: () => Promise<T>, dependencias: unknown[] = []) {
@@ -21,7 +21,7 @@ export function useApi<T>(consulta: () => Promise<T>, dependencias: unknown[] = 
       if (numero === ultima.current) setDatos(resultado);
     } catch (e) {
       if (numero === ultima.current) {
-        setError(e instanceof ApiError ? e.message : 'Ocurrió un error inesperado.');
+        setError(textoDeError(e));
       }
     } finally {
       if (numero === ultima.current) setCargando(false);

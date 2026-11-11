@@ -1,14 +1,31 @@
 import { API_URL } from '../config';
 
 /** Error de la API con el formato { error: { code, message, details } }. */
+export interface DetalleError {
+  campo: string;
+  mensaje: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
     message: string,
+    public detalles: DetalleError[] = [],
   ) {
     super(message);
   }
+
+  /** Mensaje listo para mostrar: el general más el motivo de cada campo inválido. */
+  get textoCompleto() {
+    if (this.detalles.length === 0) return this.message;
+    return `${this.message}:\n${this.detalles.map((d) => `• ${d.mensaje}`).join('\n')}`;
+  }
+}
+
+/** Texto para mostrar al usuario a partir de cualquier error. */
+export function textoDeError(e: unknown) {
+  return e instanceof ApiError ? e.textoCompleto : 'Ocurrió un error inesperado.';
 }
 
 // Usuario de prueba (hasta que Daslav tenga el login). Lo cambia UsuarioProvider.
@@ -51,6 +68,7 @@ export async function api<T>(
       res.status,
       json?.error?.code ?? 'ERROR',
       json?.error?.message ?? 'Ocurrió un error inesperado.',
+      json?.error?.details ?? [],
     );
   }
   return json as Respuesta<T>;

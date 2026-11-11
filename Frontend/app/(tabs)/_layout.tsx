@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
+import { useUsuario } from '../../src/session/UsuarioContext';
 import { colors } from '../../src/theme/colors';
 
 export default function TabsLayout() {
+  const { usuario } = useUsuario();
+  const esAdmin = usuario.rol === 'administrador';
+
   return (
     <Tabs
       screenOptions={{
@@ -28,6 +32,17 @@ export default function TabsLayout() {
           title: 'Paraderos',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="location-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
+      {/* ADM-03: solo el administrador ve esta pestaña (href: null la oculta). */}
+      <Tabs.Screen
+        name="turnos"
+        options={{
+          title: 'Turnos',
+          href: esAdmin ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" color={color as string} size={size} />
           ),
         }}
       />
