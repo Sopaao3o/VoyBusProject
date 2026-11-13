@@ -8,13 +8,13 @@ const opcional = (esquema) =>
     return valor;
   }, esquema.optional());
 
-const correo = opcional(
-  z
-    .string({ error: 'El correo electrónico debe ser un texto' })
-    .trim()
-    .toLowerCase()
-    .pipe(z.email('El correo electrónico no es válido')),
-);
+const correoObligatorio = z
+  .string({ error: 'El correo electrónico debe ser un texto' })
+  .trim()
+  .toLowerCase()
+  .pipe(z.email('El correo electrónico no es válido'));
+
+const correo = opcional(correoObligatorio);
 
 const telefono = opcional(
   z
@@ -119,4 +119,54 @@ const cierreSesionBody = z.object({
   }),
 });
 
-module.exports = { registroBody, verificacionBody, sesionBody, cierreSesionBody };
+// ACC-04: la nueva contraseña exige 8 caracteres con letras y números; el símbolo es
+// recomendado, no obligatorio. El máximo evita cadenas que bcrypt tendría que truncar.
+const passwordNueva = z
+  .string({ error: 'La nueva contraseña es obligatoria' })
+  .min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
+  .max(64, 'La nueva contraseña admite hasta 64 caracteres')
+  .regex(/\p{L}/u, 'La nueva contraseña debe incluir al menos una letra')
+  .regex(/\d/, 'La nueva contraseña debe incluir al menos un número');
+
+/** La confirmación debe coincidir exactamente con la contraseña nueva. */
+function confirmacionCoincide(datos, ctx) {
+  if (datos.password !== datos.confirmacion) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['confirmacion'],
+      message: 'La confirmación no coincide con la nueva contraseña',
+    });
+  }
+}
+
+const recuperacionBody = z.object({ correo: correoObligatorio });
+
+const restablecerPasswordBody = z
+  .object({
+    token: z
+      .string({ error: 'El enlace de recuperación es obligatorio' })
+      .trim()
+      .min(1, 'El enlace de recuperación es obligatorio')
+      .max(200, 'El enlace de recuperación no es válido'),
+    password: passwordNueva,
+    confirmacion: z.string({ error: 'Debes confirmar la nueva contraseña' }),
+  })
+  .superRefine(confirmacionCoincide);
+
+const cambioPasswordBody = z
+  .object({
+    password_actual: passwordIngreso,
+    password: passwordNueva,
+    confirmacion: z.string({ error: 'Debes confirmar la nueva contraseña' }),
+  })
+  .superRefine(confirmacionCoincide);
+
+module.exports = {
+  registroBody,
+  verificacionBody,
+  sesionBody,
+  cierreSesionBody,
+  recuperacionBody,
+  restablecerPasswordBody,
+  cambioPasswordBody,
+};

@@ -31,6 +31,7 @@ const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
  * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
  * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
+ * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
  */
 function createApp({
   models,
@@ -38,6 +39,7 @@ function createApp({
   ahora,
   simulador = false,
   exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
+  exponerTokenRecuperacion = exponerCodigoVerificacion,
 }) {
   const app = express();
 
@@ -50,10 +52,11 @@ function createApp({
   const conductor = createConductorController(createConductorService(models, { ahora }));
   const auth = createAuthController(createAuthService(models, { ahora }), {
     exponerCodigoVerificacion,
+    exponerTokenRecuperacion,
   });
   const v1 = express.Router();
   const autenticar = crearAutenticacion({ models });
-  v1.use('/auth', createAuthRoutes(auth));
+  v1.use('/auth', createAuthRoutes(auth, { autenticar }));
   v1.use(createRedRoutes(createRedController(createRedService(models))));
   v1.use(
     '/admin',

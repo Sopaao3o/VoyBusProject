@@ -14,6 +14,7 @@ const {
 } = require('../../utils/jwt');
 
 const CODIGO_MINUTOS_POR_DEFECTO = 15;
+const RECUPERACION_MINUTOS_POR_DEFECTO = 30;
 const LOGIN_MAX_INTENTOS_POR_DEFECTO = 5;
 const LOGIN_VENTANA_MINUTOS_POR_DEFECTO = 15;
 const LOGIN_BLOQUEO_MINUTOS_POR_DEFECTO = 5;
@@ -27,6 +28,12 @@ function numeroPositivo(valor, defecto) {
 const rondasBcrypt = () => Number(process.env.BCRYPT_ROUNDS) || 10;
 const minutosCodigo = () =>
   Number(process.env.CODIGO_VERIFICACION_MINUTOS) || CODIGO_MINUTOS_POR_DEFECTO;
+const minutosRecuperacion = () =>
+  Number(process.env.RECUPERACION_EXPIRA_MINUTOS) || RECUPERACION_MINUTOS_POR_DEFECTO;
+
+const MENSAJE_RECUPERACION =
+  'Si el correo pertenece a una cuenta verificada, enviamos un enlace temporal para restablecer la contraseña';
+const MENSAJE_PASSWORD_ACTUALIZADA = 'Tu contraseña fue actualizada';
 
 /** Datos del usuario que sí pueden salir en una respuesta (nunca el hash ni el código). */
 function usuarioPublico(usuario) {
@@ -144,6 +151,25 @@ function createAuthService(
       registro.bloqueadoHasta = ahoraMs + loginBloqueoMs;
     }
     intentosLogin.set(clave, registro);
+  }
+
+  /** Tras una contraseña nueva, no tiene sentido seguir bloqueando los intentos anteriores. */
+  function olvidarIntentosDe(usuario) {
+    const claves = [`usuario:${usuario.id}`];
+    if (usuario.correo) claves.push(`correo:${usuario.correo}`);
+    if (usuario.telefono) claves.push(`telefono:${usuario.telefono}`);
+    for (const clave of claves) intentosLogin.delete(clave);
+  }
+
+  /** Guarda el hash del enlace temporal; el token en claro solo viaja al correo. */
+  async function guardarTokenRecuperacion(usuario) {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expira = new Date(ahora().getTime() + minutosRecuperacion() * 60 * 1000).toISOString();
+    await usuario.update({
+      token_recuperacion: huellaToken(token),
+      token_recuperacion_expira: expira,
+    });
+    return { token, expira };
   }
 
   return {
@@ -319,6 +345,117 @@ function createAuthService(
       });
 
       return { sesion_cerrada: true, ya_estaba_cerrada: false, cerrada_en: cerradaEn };
+    },
+
+    /**
+     * ACC-04 (recuperar): genera un enlace temporal solo para cuentas con correo verificado.
+     * La respuesta es siempre la misma para no revelar si el correo tiene cuenta.
+     */
+    async recuperarPassword({ correo }) {
+      const respuesta = { mensaje: MENSAJE_RECUPERACION };
+      const usuario = await Usuario.findOne({ where: { correo } });
+
+      if (!usuario || usuario.estado === 'deshabilitado' || !usuario.correo_verificado) {
+        return respuesta;
+      }
+
+      const { token, expira } = await guardarTokenRecuperacion(usuario);
+      return { ...respuesta, token, expira_en: expira };
+    },
+
+    /**
+     * ACC-04 (restablecer): consume el enlace temporal. El token es de un solo uso y la
+     * contraseña nueva debe cumplir las reglas y ser distinta a la actual.
+     */
+    async restablecerPassword({ token, password }) {
+      const usuario = await Usuario.findOne({
+        where: { token_recuperacion: huellaToken(token) },
+      });
+      if (!usuario) {
+        throw badRequest('El enlace de recuperación no es válido o ya fue utilizado', {
+          code: 'TOKEN_RECUPERACION_INVALIDO',
+        });
+      }
+      if (
+        !usuario.token_recuperacion_expira ||
+        new Date(usuario.token_recuperacion_expira).getTime() <= ahora().getTime()
+      ) {
+        throw badRequest('El enlace de recuperación expiró. Solicita uno nuevo', {
+          code: 'TOKEN_RECUPERACION_EXPIRADO',
+        });
+      }
+      if (usuario.estado === 'deshabilitado') {
+        throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+          code: 'CUENTA_DESHABILITADA',
+        });
+      }
+      if (usuario.password_hash && (await bcrypt.compare(password, usuario.password_hash))) {
+        throw badRequest('La nueva contraseña debe ser distinta a la actual', {
+          code: 'PASSWORD_REPETIDA',
+        });
+      }
+
+      await usuario.update({
+        password_hash: await bcrypt.hash(password, rondasBcrypt()),
+        token_recuperacion: null,
+        token_recuperacion_expira: null,
+      });
+      olvidarIntentosDe(usuario);
+
+      return { mensaje: MENSAJE_PASSWORD_ACTUALIZADA };
+    },
+
+    /**
+     * ACC-04 (cambiar): desde el perfil, con la contraseña actual como confirmación.
+     * Los fallos repetidos de la contraseña actual aplican la misma espera que ACC-02.
+     */
+    async cambiarPassword({ sesion, password_actual, password }) {
+      const usuarioId = sesion?.usuarioId;
+      if (!usuarioId) {
+        throw new HttpError(401, 'Falta la sesión para cambiar la contraseña', {
+          code: 'NO_AUTENTICADO',
+        });
+      }
+
+      const clave = `usuario:${usuarioId}`;
+      exigirSinBloqueo(clave);
+
+      const usuario = await Usuario.findByPk(usuarioId);
+      if (!usuario) {
+        throw new HttpError(401, 'La sesión no es válida', { code: 'NO_AUTENTICADO' });
+      }
+      if (usuario.estado === 'deshabilitado') {
+        throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+          code: 'CUENTA_DESHABILITADA',
+        });
+      }
+
+      // Se compara siempre, aunque la cuenta no tenga contraseña (invitado), sin filtrar detalles.
+      const coincide = await bcrypt.compare(
+        password_actual,
+        usuario.password_hash || hashDeRelleno,
+      );
+      if (!coincide) {
+        registrarIntentoFallido(clave);
+        throw new HttpError(401, 'La contraseña actual no es correcta', {
+          code: 'PASSWORD_ACTUAL_INCORRECTA',
+        });
+      }
+      intentosLogin.delete(clave);
+
+      if (usuario.password_hash && (await bcrypt.compare(password, usuario.password_hash))) {
+        throw badRequest('La nueva contraseña debe ser distinta a la actual', {
+          code: 'PASSWORD_REPETIDA',
+        });
+      }
+
+      await usuario.update({
+        password_hash: await bcrypt.hash(password, rondasBcrypt()),
+        token_recuperacion: null,
+        token_recuperacion_expira: null,
+      });
+
+      return { mensaje: MENSAJE_PASSWORD_ACTUALIZADA };
     },
 
     /** Confirma el código enviado al correo o teléfono y habilita la cuenta. */

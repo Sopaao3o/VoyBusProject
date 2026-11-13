@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (90)                           |
+| `npm test`             | Ejecuta las pruebas automáticas (100)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -68,8 +68,8 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 
 ## Autenticación
 
-ACC-01, ACC-02 y ACC-03 emiten y cierran JWT (`Authorization: Bearer <token>`). En
-`src/middleware/auth.js`:
+ACC-01, ACC-02 y ACC-03 emiten, validan y cierran JWT (`Authorization: Bearer <token>`); ACC-04
+usa ese mismo token para cambiar la contraseña. En `src/middleware/auth.js`:
 
 - `crearAutenticacion({ models })` valida el JWT en las rutas privadas (`/admin`, `/conductor` y
   `/viajes`). Un token inválido, expirado o cerrado responde `401`; el válido deja la identidad en
@@ -201,6 +201,52 @@ Reglas de ACC-03:
 - La confirmación en pantalla y el borrado del token en el dispositivo pertenecen al frontend de
   ACC-03 (aún no implementado).
 
+### Recuperar y cambiar contraseña (ACC-04)
+
+| Método y ruta                            | Descripción                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| `POST /api/v1/auth/recuperar-password`   | Envía un enlace temporal al correo verificado (público).           |
+| `POST /api/v1/auth/restablecer-password` | Consume el enlace temporal y define la nueva contraseña (público). |
+| `POST /api/v1/auth/cambiar-password`     | Cambia la contraseña desde el perfil (requiere JWT).               |
+
+**Recuperar:** cuerpo `{ "correo": "ana@example.com" }`. La respuesta es siempre la misma para no
+revelar si el correo tiene cuenta:
+
+```json
+{
+  "data": {
+    "mensaje": "Si el correo pertenece a una cuenta verificada, enviamos un enlace temporal para restablecer la contraseña"
+  }
+}
+```
+
+En desarrollo (`NODE_ENV` distinto de `production`) se agrega `data.token_desarrollo` y
+`data.expira_en` para poder probar sin un servicio de correo; en producción el enlace solo se
+enviaría al correo. El enlace vence según `RECUPERACION_EXPIRA_MINUTOS` (30 por defecto) y solo se
+genera para cuentas `habilitado` con `correo_verificado`.
+
+**Restablecer:** cuerpo `{ "token": "...", "password": "NuevaClave1", "confirmacion": "NuevaClave1" }`.
+Responde `{ "data": { "mensaje": "Tu contraseña fue actualizada" } }`. El token es de un solo uso,
+por lo que un enlace ya usado o vencido responde `400 TOKEN_RECUPERACION_INVALIDO` /
+`TOKEN_RECUPERACION_EXPIRADO`.
+
+**Cambiar:** cuerpo `{ "password_actual": "...", "password": "NuevaClave1", "confirmacion": "..." }`
+con `Authorization: Bearer <token>`. No acepta `x-user-id`: sin JWT responde `401 NO_AUTENTICADO`.
+
+Reglas de ACC-04:
+
+- La contraseña actual es obligatoria para cambiar; si no coincide, `401 PASSWORD_ACTUAL_INCORRECTA`
+  con un mensaje general, y los fallos repetidos responden `429 DEMASIADOS_INTENTOS` con
+  `Retry-After` (mismos `LOGIN_MAX_INTENTOS`, `LOGIN_VENTANA_MINUTOS` y `LOGIN_BLOQUEO_MINUTOS`
+  que ACC-02).
+- La nueva contraseña debe tener entre 8 y 64 caracteres, con al menos una letra y un número; el
+  símbolo es recomendado, no obligatorio.
+- La confirmación debe coincidir exactamente y la nueva contraseña debe ser distinta a la actual
+  (`400 PASSWORD_REPETIDA`).
+- Restablecer o cambiar la contraseña invalida cualquier enlace de recuperación pendiente y limpia
+  el bloqueo de intentos de inicio de sesión de esa cuenta.
+- Las sesiones ya abiertas de la cuenta siguen vigentes después del cambio (ver Pendiente).
+
 ### Red de transporte (RED-01, RED-02) · públicos
 
 | Método y ruta                | Descripción                                                                          |
@@ -272,4 +318,6 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 - Que las rutas protegidas exijan siempre un JWT: hoy, si no viene `Authorization`, todavía
   aceptan el encabezado de desarrollo `x-user-id`.
 - Configuración de verificación en dos pasos con autenticador (ACC-01), que ACC-02 exigiría.
+- Cerrar las demás sesiones al cambiar o restablecer la contraseña (requiere versionar los tokens
+  por cuenta).
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.

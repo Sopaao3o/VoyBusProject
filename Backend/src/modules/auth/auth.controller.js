@@ -1,5 +1,8 @@
-// Los controllers de ACC-01, ACC-02 y ACC-03 reciben la petición ya validada y arman la respuesta.
-function createAuthController(service, { exponerCodigoVerificacion = false } = {}) {
+// Los controllers de ACC-01 a ACC-04 reciben la petición ya validada y arman la respuesta.
+function createAuthController(
+  service,
+  { exponerCodigoVerificacion = false, exponerTokenRecuperacion = exponerCodigoVerificacion } = {},
+) {
   return {
     registrar: async (req, res) => {
       const { usuario, verificacion, codigo } = await service.registrar(req.datos.body);
@@ -22,6 +25,33 @@ function createAuthController(service, { exponerCodigoVerificacion = false } = {
 
     cerrarSesion: async (req, res) => {
       res.json({ data: await service.cerrarSesion({ autorizacion: req.headers.authorization }) });
+    },
+
+    recuperarPassword: async (req, res) => {
+      const { mensaje, token, expira_en } = await service.recuperarPassword(req.datos.body);
+      const data = { mensaje };
+      // Sin servicio de correo, en desarrollo se devuelve el enlace para poder probar.
+      // En producción el token solo se enviaría al correo verificado.
+      if (exponerTokenRecuperacion && token) {
+        data.token_desarrollo = token;
+        data.expira_en = expira_en;
+      }
+      res.json({ data });
+    },
+
+    restablecerPassword: async (req, res) => {
+      res.json({ data: await service.restablecerPassword(req.datos.body) });
+    },
+
+    cambiarPassword: async (req, res) => {
+      try {
+        res.json({
+          data: await service.cambiarPassword({ sesion: req.auth, ...req.datos.body }),
+        });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
     },
 
     verificarContacto: async (req, res) => {

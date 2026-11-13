@@ -22,6 +22,8 @@ module.exports = (sequelize) =>
       codigo_verificacion: DataTypes.STRING,
       codigo_verificacion_expira: DataTypes.STRING,
       canal_verificacion: DataTypes.STRING,
+      token_recuperacion: DataTypes.STRING,
+      token_recuperacion_expira: DataTypes.STRING,
       fecha_registro: DataTypes.STRING,
     },
     { tableName: 'usuarios', timestamps: false },
