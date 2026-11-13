@@ -16,6 +16,7 @@ module.exports = (sequelize) =>
       dos_factores_secreto: DataTypes.STRING,
       dos_factores_confirmado_en: DataTypes.STRING,
       dos_factores_ultimo_paso: DataTypes.INTEGER,
+      token_version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       tipo_acceso: { type: DataTypes.STRING, defaultValue: 'registrado' },
       identificador: DataTypes.STRING,
       datos_contacto: DataTypes.STRING,

@@ -218,16 +218,76 @@ test('ACC-04: cambia la contraseña desde el perfil con la contraseña actual', 
   const cambio = await cambiar(token, PASSWORD);
   assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
   assert.equal(cambio.body.data.mensaje, 'Tu contraseña fue actualizada');
+  assert.ok(cambio.body.data.token, 'devuelve un token nuevo para la sesión actual');
+  assert.notEqual(cambio.body.data.token, token);
+  const tokenNuevo = cambio.body.data.token;
 
   assert.equal((await iniciar(correo)).status, 401);
   assert.equal((await iniciar(correo, PASSWORD_NUEVA)).status, 200);
 
-  // La sesión actual sigue vigente después del cambio.
-  assert.equal((await pedir('GET', '/viajes/999/paraderos-disponibles', { token })).status, 404);
+  // El token anterior ya no sirve; el nuevo mantiene la sesión actual.
+  const conAnterior = await pedir('GET', '/viajes/999/paraderos-disponibles', { token });
+  assert.equal(conAnterior.status, 401);
+  assert.equal(conAnterior.body.error.code, 'SESION_CERRADA');
+  assert.equal(
+    (await pedir('GET', '/viajes/999/paraderos-disponibles', { token: tokenNuevo })).status,
+    404,
+  );
 
-  const igual = await cambiar(token, PASSWORD_NUEVA, PASSWORD_NUEVA, PASSWORD_NUEVA);
+  const igual = await cambiar(tokenNuevo, PASSWORD_NUEVA, PASSWORD_NUEVA, PASSWORD_NUEVA);
   assert.equal(igual.status, 400);
   assert.equal(igual.body.error.code, 'PASSWORD_REPETIDA');
+});
+
+test('ACC-04: cambiar la contraseña cierra las demás sesiones y renueva la actual', async () => {
+  const { correo } = await crearCuenta();
+  const primera = (await iniciar(correo)).body.data.token;
+  const segunda = (await iniciar(correo)).body.data.token;
+  assert.notEqual(primera, segunda);
+
+  const cambio = await cambiar(primera, PASSWORD);
+  assert.equal(cambio.status, 200, JSON.stringify(cambio.body));
+  const renovada = cambio.body.data.token;
+  assert.ok(renovada);
+
+  for (const [nombre, token] of [
+    ['la sesión que cambió la contraseña', primera],
+    ['la otra sesión', segunda],
+  ]) {
+    const r = await pedir('GET', '/viajes/999/paraderos-disponibles', { token });
+    assert.equal(r.status, 401, nombre);
+    assert.equal(r.body.error.code, 'SESION_CERRADA', nombre);
+  }
+  assert.equal(
+    (await pedir('GET', '/viajes/999/paraderos-disponibles', { token: renovada })).status,
+    404,
+  );
+
+  const cuenta = await models.Usuario.findOne({ where: { correo } });
+  assert.equal(cuenta.token_version, 1);
+});
+
+test('ACC-04: restablecer la contraseña cierra todas las sesiones', async () => {
+  const { correo } = await crearCuenta();
+  const sesion = (await iniciar(correo)).body.data.token;
+  const { token_desarrollo: enlace } = (await recuperar(correo)).body.data;
+
+  assert.equal((await restablecer(enlace)).status, 200);
+
+  const r = await pedir('GET', '/viajes/999/paraderos-disponibles', { token: sesion });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'SESION_CERRADA');
+
+  const ingreso = await iniciar(correo, PASSWORD_NUEVA);
+  assert.equal(ingreso.status, 200);
+  assert.equal(
+    (await pedir('GET', '/viajes/999/paraderos-disponibles', { token: ingreso.body.data.token }))
+      .status,
+    404,
+  );
+
+  const cuenta = await models.Usuario.findOne({ where: { correo } });
+  assert.equal(cuenta.token_version, 1);
 });
 
 test('ACC-04: varios fallos con la contraseña actual piden esperar', async () => {

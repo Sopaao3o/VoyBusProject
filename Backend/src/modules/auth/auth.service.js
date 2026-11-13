@@ -395,6 +395,15 @@ function createAuthService(
         );
       }
 
+      // Si la contraseña cambió mientras se esperaba el código, el desafío queda sin efecto.
+      if ((Number(payload.token_version) || 0) !== (Number(usuario.token_version) || 0)) {
+        throw new HttpError(
+          401,
+          'La verificación en dos pasos expiró. Inicia sesión de nuevo para continuar',
+          { code: 'DESAFIO_2FA_INVALIDO' },
+        );
+      }
+
       const paso = exigirCodigo2fa(usuario, codigo, { status: 401 });
       await usuario.update({ dos_factores_ultimo_paso: paso });
 
@@ -625,6 +634,9 @@ function createAuthService(
         password_hash: await bcrypt.hash(password, rondasBcrypt()),
         token_recuperacion: null,
         token_recuperacion_expira: null,
+        // Cierra todas las sesiones abiertas: el enlace se usa, por lo general, desde otro
+        // dispositivo o después de haber perdido el acceso.
+        token_version: (Number(usuario.token_version) || 0) + 1,
       });
       olvidarIntentosDe(usuario);
 
@@ -679,9 +691,14 @@ function createAuthService(
         password_hash: await bcrypt.hash(password, rondasBcrypt()),
         token_recuperacion: null,
         token_recuperacion_expira: null,
+        // Cierra las demás sesiones. La sesión actual continúa con el token nuevo de abajo.
+        token_version: (Number(usuario.token_version) || 0) + 1,
       });
 
-      return { mensaje: MENSAJE_PASSWORD_ACTUALIZADA };
+      return {
+        mensaje: MENSAJE_PASSWORD_ACTUALIZADA,
+        ...firmarToken(usuario),
+      };
     },
 
     /** Confirma el código enviado al correo o teléfono y habilita la cuenta. */

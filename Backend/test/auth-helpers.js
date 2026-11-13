@@ -20,7 +20,12 @@ function tokenPara(usuario) {
     throw new Error(`Usuario de prueba sin rol asignado: ${JSON.stringify(usuario)}`);
   }
   return jwt.sign(
-    { sub: String(datos.id), rol: datos.rol, tipo_acceso: datos.tipo_acceso || 'registrado' },
+    {
+      sub: String(datos.id),
+      rol: datos.rol,
+      tipo_acceso: datos.tipo_acceso || 'registrado',
+      token_version: Number(datos.token_version) || 0,
+    },
     process.env.JWT_SECRET || 'voybus-dev-secret-no-usar-en-produccion',
     { expiresIn: '1h' },
   );

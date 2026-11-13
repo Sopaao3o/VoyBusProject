@@ -18,7 +18,13 @@ const ALCANCE_DOS_FACTORES = '2fa';
 /** Firma el token de una cuenta y devuelve los datos públicos de la sesión. */
 function firmarToken(usuario) {
   const token = jwt.sign(
-    { sub: String(usuario.id), rol: usuario.rol, tipo_acceso: usuario.tipo_acceso },
+    {
+      sub: String(usuario.id),
+      rol: usuario.rol,
+      tipo_acceso: usuario.tipo_acceso,
+      // Permite invalidar todas las sesiones de la cuenta al cambiar la contraseña.
+      token_version: Number(usuario.token_version) || 0,
+    },
     secretoJwt(),
     // jti hace que dos inicios de sesión seguidos no compartan token, para poder cerrarlos por separado.
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d', jwtid: crypto.randomUUID() },
@@ -38,6 +44,7 @@ function firmarDesafio2fa(usuario) {
       sub: String(usuario.id),
       rol: usuario.rol,
       tipo_acceso: usuario.tipo_acceso,
+      token_version: Number(usuario.token_version) || 0,
       alcance: ALCANCE_DOS_FACTORES,
     },
     secretoJwt(),

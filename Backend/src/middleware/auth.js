@@ -10,7 +10,7 @@ const { verificarToken, huellaToken, tokenDeAutorizacion } = require('../utils/j
  * - Con un JWT inválido, expirado o cerrado: responde 401.
  */
 function crearAutenticacion({ models }) {
-  const { TokenRevocado } = models;
+  const { TokenRevocado, Usuario } = models;
 
   return async (req, _res, next) => {
     const token = tokenDeAutorizacion(req.headers.authorization);
@@ -49,11 +49,31 @@ function crearAutenticacion({ models }) {
       return next(new HttpError(401, 'La sesión ya fue cerrada', { code: 'SESION_CERRADA' }));
     }
 
+    // Cambiar o restablecer la contraseña incrementa esta versión: los tokens emitidos antes
+    // dejan de servir, aunque su firma y su fecha de expiración sigan siendo válidas.
+    const usuario = await Usuario.findByPk(usuarioId, {
+      attributes: ['id', 'token_version'],
+    });
+    const versionActual = Number(usuario?.token_version) || 0;
+    const versionDelToken = Number(payload.token_version) || 0;
+    if (!usuario || versionDelToken !== versionActual) {
+      return next(
+        new HttpError(
+          401,
+          'La sesión se cerró porque la contraseña cambió. Inicia sesión de nuevo',
+          {
+            code: 'SESION_CERRADA',
+          },
+        ),
+      );
+    }
+
     req.auth = {
       usuarioId,
       rol: payload.rol,
       tipoAcceso: payload.tipo_acceso,
       tokenHash,
+      tokenVersion: versionDelToken,
       expiraEn: new Date(payload.exp * 1000).toISOString(),
     };
     next();

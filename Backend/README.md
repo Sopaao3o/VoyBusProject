@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (113)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (115)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -78,6 +78,10 @@ usa además un desafío temporal que **no** es una sesión. En `src/middleware/a
 - `requireRole(...roles)` exige que `req.auth.rol` esté entre los roles permitidos
   (`403 SIN_PERMISO`).
 - `usuarioActual(req)` devuelve el `usuarioId` del token; ya no existe el encabezado `x-user-id`.
+- Cada JWT incluye `token_version`, la versión de sesiones de la cuenta, y el middleware la compara
+  con `usuarios.token_version`. Si no coinciden, responde `401 SESION_CERRADA`: al cambiar o
+  restablecer la contraseña se incrementa la versión y todos los tokens emitidos antes dejan de
+  servir, aunque su firma y su vencimiento sigan siendo válidos.
 
 El frontend debe enviar `Authorization: Bearer <token>` en todas las rutas privadas. Las cuentas
 de ejemplo del selector de usuario todavía no tienen token: hasta que exista el login de ACC-02 en
@@ -298,6 +302,8 @@ por lo que un enlace ya usado o vencido responde `400 TOKEN_RECUPERACION_INVALID
 
 **Cambiar:** cuerpo `{ "password_actual": "...", "password": "NuevaClave1", "confirmacion": "..." }`
 con `Authorization: Bearer <token>`. No acepta `x-user-id`: sin JWT responde `401 NO_AUTENTICADO`.
+La respuesta incluye un `token` nuevo para la sesión actual; el token usado en la petición deja de
+servir, igual que las demás sesiones abiertas de la cuenta.
 
 Reglas de ACC-04:
 
@@ -311,7 +317,9 @@ Reglas de ACC-04:
   (`400 PASSWORD_REPETIDA`).
 - Restablecer o cambiar la contraseña invalida cualquier enlace de recuperación pendiente y limpia
   el bloqueo de intentos de inicio de sesión de esa cuenta.
-- Las sesiones ya abiertas de la cuenta siguen vigentes después del cambio (ver Pendiente).
+- Al cambiar la contraseña se incrementa `token_version`: las demás sesiones quedan cerradas y la
+  respuesta entrega un token nuevo para que la sesión actual continúe. Al restablecerla con el
+  enlace se cierran todas las sesiones abiertas.
 
 ### Red de transporte (RED-01, RED-02) · públicos
 
@@ -381,6 +389,4 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Cerrar las demás sesiones al cambiar o restablecer la contraseña (requiere versionar los tokens
-  por cuenta).
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.
