@@ -35,6 +35,15 @@ function crearAutenticacion({ models }) {
       return next(new HttpError(401, 'La sesión no es válida', { code: 'TOKEN_INVALIDO' }));
     }
 
+    // Un desafío de 2FA solo sirve para enviar el código; nunca abre una ruta privada.
+    if (payload.alcance) {
+      return next(
+        new HttpError(401, 'Completa la verificación en dos pasos para continuar', {
+          code: 'SEGUNDO_FACTOR_PENDIENTE',
+        }),
+      );
+    }
+
     const tokenHash = huellaToken(token);
     if (await TokenRevocado.findByPk(tokenHash)) {
       return next(new HttpError(401, 'La sesión ya fue cerrada', { code: 'SESION_CERRADA' }));

@@ -1,6 +1,6 @@
-// ACC-01: creación de cuentas de pasajero y verificación del medio de contacto.
-// ACC-02: inicio de sesión. ACC-03: cierre de sesión.
-// No incluye Google/Apple ni verificación en dos pasos (fuera del alcance pedido).
+// ACC-01: creación de cuentas de pasajero, verificación del medio de contacto y configuración
+// de la verificación en dos pasos (TOTP). ACC-02: inicio de sesión. ACC-03: cierre de sesión.
+// No incluye Google/Apple (fuera del alcance pedido).
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
@@ -9,9 +9,12 @@ const { HttpError, conflict, notFound, badRequest } = require('../../utils/httpE
 const {
   firmarToken,
   verificarToken,
+  firmarDesafio2fa,
+  verificarDesafio2fa,
   huellaToken,
   tokenDeAutorizacion,
 } = require('../../utils/jwt');
+const { generarSecreto, verificarCodigoTotp, urlOtpauth } = require('../../utils/totp');
 
 const CODIGO_MINUTOS_POR_DEFECTO = 15;
 const RECUPERACION_MINUTOS_POR_DEFECTO = 30;
@@ -47,6 +50,7 @@ function usuarioPublico(usuario) {
     tipo_acceso: usuario.tipo_acceso,
     correo_verificado: Boolean(usuario.correo_verificado),
     telefono_verificado: Boolean(usuario.telefono_verificado),
+    dos_factores_activo: Boolean(usuario.dos_factores_activo),
     fecha_registro: usuario.fecha_registro,
   };
 }
@@ -172,6 +176,59 @@ function createAuthService(
     return { token, expira };
   }
 
+  /** Cuenta autenticada por el JWT, lista para las operaciones sensibles del perfil. */
+  async function usuarioDeSesion(sesion) {
+    const usuarioId = sesion?.usuarioId;
+    if (!usuarioId) {
+      throw new HttpError(401, 'Falta la sesión para esta operación', {
+        code: 'NO_AUTENTICADO',
+      });
+    }
+    const usuario = await Usuario.findByPk(usuarioId);
+    if (!usuario) {
+      throw new HttpError(401, 'La sesión no es válida', { code: 'NO_AUTENTICADO' });
+    }
+    if (usuario.estado === 'deshabilitado') {
+      throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+        code: 'CUENTA_DESHABILITADA',
+      });
+    }
+    return usuario;
+  }
+
+  /** Solo las cuentas registradas con contraseña pueden usar la aplicación autenticadora. */
+  function exigirCuentaConPassword(usuario) {
+    if (usuario.tipo_acceso === 'invitado' || !usuario.password_hash) {
+      throw new HttpError(
+        403,
+        'Las cuentas de invitado no pueden activar la verificación en dos pasos',
+        { code: 'CUENTA_INVITADA' },
+      );
+    }
+  }
+
+  /**
+   * Comprueba el código TOTP con la misma espera que ACC-02 tras varios fallos.
+   * El paso aceptado se devuelve para guardarlo y no reutilizar el mismo código.
+   */
+  function exigirCodigo2fa(usuario, codigo, { status = 400 } = {}) {
+    const clave = `2fa:${usuario.id}`;
+    exigirSinBloqueo(clave);
+
+    const paso = verificarCodigoTotp(usuario.dos_factores_secreto, codigo, {
+      fecha: ahora(),
+      ultimoPaso: usuario.dos_factores_ultimo_paso,
+    });
+    if (paso === null) {
+      registrarIntentoFallido(clave);
+      throw new HttpError(status, 'El código de verificación en dos pasos no es correcto', {
+        code: 'CODIGO_2FA_INVALIDO',
+      });
+    }
+    intentosLogin.delete(clave);
+    return paso;
+  }
+
   return {
     /**
      * Registro público: siempre crea un pasajero, aunque el cuerpo intente enviar otro rol.
@@ -271,18 +328,187 @@ function createAuthService(
         );
       }
 
-      // La configuración de 2FA pertenece a ACC-01 y quedó fuera de este alcance: el esquema
-      // no guarda el secreto del autenticador. Si una cuenta lo tuviera activo, no se omite
-      // el segundo factor: se le pide contactar al administrador.
+      // ACC-02: si la cuenta tiene la verificación en dos pasos activa, la contraseña sola no
+      // inicia sesión. Se entrega un desafío temporal y se pide el código de la app autenticadora.
       if (usuario.dos_factores_activo) {
-        throw new HttpError(
-          403,
-          'Esta cuenta tiene la verificación en dos pasos activada, pero aún no está configurada. Contacta al administrador',
-          { code: 'SEGUNDO_FACTOR_REQUERIDO' },
-        );
+        if (!usuario.dos_factores_secreto) {
+          throw new HttpError(
+            403,
+            'La verificación en dos pasos está activada, pero la cuenta no tiene un secreto configurado. Contacta al administrador',
+            { code: 'SEGUNDO_FACTOR_NO_CONFIGURADO' },
+          );
+        }
+        return {
+          requiere_2fa: true,
+          usuario: usuarioPublico(usuario),
+          ...firmarDesafio2fa(usuario),
+        };
       }
 
       return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
+    },
+
+    /**
+     * ACC-02: segundo paso del inicio de sesión. Cambia el desafío temporal por una sesión
+     * solo si el código de la aplicación autenticadora es correcto.
+     */
+    async verificarSegundoFactor({ desafio, codigo }) {
+      let payload;
+      try {
+        payload = verificarDesafio2fa(desafio);
+      } catch {
+        throw new HttpError(
+          401,
+          'La verificación en dos pasos expiró. Inicia sesión de nuevo para continuar',
+          { code: 'DESAFIO_2FA_INVALIDO' },
+        );
+      }
+
+      const usuarioId = Number(payload.sub);
+      if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+        throw new HttpError(401, 'El desafío de verificación en dos pasos no es válido', {
+          code: 'DESAFIO_2FA_INVALIDO',
+        });
+      }
+
+      const usuario = await Usuario.findByPk(usuarioId);
+      if (!usuario) {
+        throw new HttpError(401, 'El desafío de verificación en dos pasos no es válido', {
+          code: 'DESAFIO_2FA_INVALIDO',
+        });
+      }
+      if (usuario.estado === 'deshabilitado') {
+        throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+          code: 'CUENTA_DESHABILITADA',
+        });
+      }
+      if (usuario.estado === 'sin_verificar') {
+        throw new HttpError(403, 'La cuenta todavía no está verificada', {
+          code: 'CUENTA_SIN_VERIFICAR',
+        });
+      }
+      if (!usuario.dos_factores_activo || !usuario.dos_factores_secreto) {
+        throw new HttpError(
+          409,
+          'La verificación en dos pasos ya no está activa. Inicia sesión de nuevo',
+          { code: 'DESAFIO_2FA_INVALIDO' },
+        );
+      }
+
+      const paso = exigirCodigo2fa(usuario, codigo, { status: 401 });
+      await usuario.update({ dos_factores_ultimo_paso: paso });
+
+      return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
+    },
+
+    /**
+     * ACC-01 (configurar 2FA): genera el secreto y la URL otpauth:// que el frontend muestra
+     * como QR. Todavía no se activa: falta confirmar un código de 6 dígitos.
+     */
+    async iniciarConfiguracion2fa({ sesion }) {
+      const usuario = await usuarioDeSesion(sesion);
+      exigirCuentaConPassword(usuario);
+
+      if (usuario.dos_factores_activo) {
+        throw conflict(
+          'La verificación en dos pasos ya está activa. Desactívala antes de configurarla de nuevo',
+          { code: 'DOS_FACTORES_YA_ACTIVO' },
+        );
+      }
+
+      const secreto = generarSecreto();
+      await usuario.update({
+        dos_factores_secreto: secreto,
+        dos_factores_confirmado_en: null,
+        dos_factores_ultimo_paso: null,
+      });
+
+      const cuenta = usuario.correo || usuario.telefono || usuario.nombre_visible;
+      return {
+        secreto,
+        cuenta,
+        emisor: 'VoyBus',
+        algoritmo: 'SHA1',
+        digitos: 6,
+        periodo: 30,
+        otpauth_url: urlOtpauth({ secreto, cuenta }),
+        instrucciones:
+          'Escanea el código QR con tu aplicación autenticadora y confirma el código de 6 dígitos',
+      };
+    },
+
+    /**
+     * ACC-01 (activar 2FA): confirma el código de la aplicación autenticadora y activa la
+     * verificación en dos pasos. Un código inválido no activa nada.
+     */
+    async confirmarConfiguracion2fa({ sesion, codigo }) {
+      const usuario = await usuarioDeSesion(sesion);
+      exigirCuentaConPassword(usuario);
+
+      if (usuario.dos_factores_activo) {
+        throw conflict('La verificación en dos pasos ya está activa', {
+          code: 'DOS_FACTORES_YA_ACTIVO',
+        });
+      }
+      if (!usuario.dos_factores_secreto) {
+        throw badRequest(
+          'Primero inicia la configuración de la verificación en dos pasos para obtener el código QR',
+          { code: 'DOS_FACTORES_SIN_CONFIGURAR' },
+        );
+      }
+
+      // El paso no se marca como usado: así el mismo código sirve para entrar de inmediato.
+      exigirCodigo2fa(usuario, codigo);
+      await usuario.update({
+        dos_factores_activo: 1,
+        dos_factores_confirmado_en: ahora().toISOString(),
+        dos_factores_ultimo_paso: null,
+      });
+
+      return {
+        mensaje: 'Verificación en dos pasos activada',
+        usuario: usuarioPublico(usuario),
+      };
+    },
+
+    /**
+     * ACC-01: desactiva la verificación en dos pasos. Exige la contraseña actual y un código
+     * válido para que un token robado no pueda desactivarla por sí solo.
+     */
+    async desactivar2fa({ sesion, password_actual, codigo }) {
+      const usuario = await usuarioDeSesion(sesion);
+      exigirCuentaConPassword(usuario);
+
+      if (!usuario.dos_factores_activo || !usuario.dos_factores_secreto) {
+        throw conflict('La verificación en dos pasos no está activa', {
+          code: 'DOS_FACTORES_NO_ACTIVO',
+        });
+      }
+
+      const clavePassword = `usuario:${usuario.id}`;
+      exigirSinBloqueo(clavePassword);
+      const coincide = await bcrypt.compare(password_actual, usuario.password_hash);
+      if (!coincide) {
+        registrarIntentoFallido(clavePassword);
+        throw new HttpError(401, 'La contraseña actual no es correcta', {
+          code: 'PASSWORD_ACTUAL_INCORRECTA',
+        });
+      }
+      intentosLogin.delete(clavePassword);
+
+      exigirCodigo2fa(usuario, codigo);
+
+      await usuario.update({
+        dos_factores_activo: 0,
+        dos_factores_secreto: null,
+        dos_factores_confirmado_en: null,
+        dos_factores_ultimo_paso: null,
+      });
+
+      return {
+        mensaje: 'Verificación en dos pasos desactivada',
+        usuario: usuarioPublico(usuario),
+      };
     },
 
     /**

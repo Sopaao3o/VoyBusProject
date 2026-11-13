@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (101)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (113)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -42,10 +42,10 @@ Backend/
 │   │   ├── seeders/            # datos de ejemplo
 │   │   └── run.js              # npm run db:migrar / db:reset
 │   ├── middleware/
-│   │   ├── auth.js             # PLACEHOLDER de autenticación (ver más abajo)
+│   │   ├── auth.js             # autenticación JWT y roles de las rutas privadas
 │   │   └── validar.js          # valida params, query y body con Zod
 │   ├── modules/
-│   │   ├── auth/               # ACC-01
+│   │   ├── auth/               # ACC-01 a ACC-04
 │   │   ├── red/                # RED-01 y RED-02
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
@@ -69,7 +69,8 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 ## Autenticación
 
 ACC-01, ACC-02 y ACC-03 emiten, validan y cierran JWT (`Authorization: Bearer <token>`); ACC-04
-usa ese mismo token para cambiar la contraseña. En `src/middleware/auth.js`:
+usa ese mismo token para cambiar la contraseña. La verificación en dos pasos de ACC-01 y ACC-02
+usa además un desafío temporal que **no** es una sesión. En `src/middleware/auth.js`:
 
 - `crearAutenticacion({ models })` exige el JWT en las rutas privadas (`/admin`, `/conductor` y
   `/viajes`). Sin `Authorization` responde `401 NO_AUTENTICADO`; un token inválido, expirado o
@@ -153,6 +154,10 @@ También se acepta `{ "telefono": "+56912345678", "password": "Clave123!" }`.
 La respuesta tiene la misma forma que la verificación de ACC-01:
 `{ "data": { "usuario": ..., "token": ..., "token_type": "Bearer", "expira_en": ... } }`.
 
+Si la cuenta tiene la verificación en dos pasos activa, la respuesta no incluye `token`: incluye
+`requiere_2fa` y un `desafio` que se cambia por la sesión en `/auth/2fa/verificar` (ver la sección
+siguiente).
+
 Reglas de ACC-02:
 
 - El medio de contacto debe ser el usado al registrarse.
@@ -162,9 +167,66 @@ Reglas de ACC-02:
   `LOGIN_BLOQUEO_MINUTOS` y responde `429 DEMASIADOS_INTENTOS` con el encabezado `Retry-After`.
 - Las cuentas `sin_verificar` responden `403 CUENTA_SIN_VERIFICAR` con instrucciones para
   completar la verificación; las `deshabilitadas` responden `403 CUENTA_DESHABILITADA`.
-- La configuración de verificación en dos pasos con autenticador quedó fuera de ACC-01. Si una
-  cuenta tiene `dos_factores_activo`, ACC-02 no la deja entrar para no omitir el segundo factor
-  (`403 SEGUNDO_FACTOR_REQUERIDO`).
+- Cuando la verificación en dos pasos está activa, la contraseña sola no inicia sesión: se exige el
+  código de la aplicación autenticadora.
+
+### Verificación en dos pasos (ACC-01 / ACC-02) · requiere JWT
+
+ACC-01 permite activar la verificación en dos pasos con una aplicación autenticadora (TOTP,
+SHA-1, 6 dígitos y pasos de 30 segundos). ACC-02 la exige al iniciar sesión si está activa.
+
+| Método y ruta                      | Descripción                                                           |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `POST /api/v1/auth/2fa/iniciar`    | Genera el secreto y la URL `otpauth://` para el QR (requiere JWT).    |
+| `POST /api/v1/auth/2fa/confirmar`  | Activa la 2FA al confirmar un código de 6 dígitos (requiere JWT).     |
+| `POST /api/v1/auth/2fa/desactivar` | Desactiva la 2FA con la contraseña actual y un código (requiere JWT). |
+| `POST /api/v1/auth/2fa/verificar`  | Cambia el desafío de ACC-02 por la sesión (público).                  |
+
+**Iniciar:** sin cuerpo. Responde el secreto en base32, la URL para el QR y los datos que necesita
+la aplicación autenticadora:
+
+```json
+{
+  "data": {
+    "secreto": "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+    "cuenta": "ana@example.com",
+    "emisor": "VoyBus",
+    "algoritmo": "SHA1",
+    "digitos": 6,
+    "periodo": 30,
+    "otpauth_url": "otpauth://totp/VoyBus%3Aana%40example.com?secret=...&issuer=VoyBus&algorithm=SHA1&digits=6&period=30",
+    "instrucciones": "Escanea el código QR con tu aplicación autenticadora y confirma el código de 6 dígitos"
+  }
+}
+```
+
+**Confirmar:** `{ "codigo": "123456" }`. Activa la cuenta (`usuario.dos_factores_activo: true`).
+Un código incorrecto responde `400 CODIGO_2FA_INVALIDO` y no activa nada.
+
+**Inicio de sesión con 2FA:** con la 2FA activa, `iniciar-sesion` responde `200` con
+`{ "requiere_2fa": true, "desafio": "...", "expira_en": "..." }` y **no** entrega el token de
+sesión. El desafío vence a los `DOS_FACTORES_MINUTOS` (5 por defecto) y no sirve para las rutas
+privadas (`401 SEGUNDO_FACTOR_PENDIENTE`). Después se envía:
+
+```json
+{ "desafio": "...", "codigo": "123456" }
+```
+
+a `POST /api/v1/auth/2fa/verificar`; solo entonces se devuelve el JWT de sesión.
+
+**Desactivar:** `{ "password_actual": "Clave123!", "codigo": "123456" }`.
+
+Reglas de la 2FA:
+
+- El código es de 6 dígitos, SHA-1 y cambia cada 30 s; se acepta un paso de margen por desfase de
+  reloj. Cada código se puede usar una sola vez (`dos_factores_ultimo_paso`).
+- Tras `LOGIN_MAX_INTENTOS` códigos incorrectos se aplica la misma espera de ACC-02
+  (`429 DEMASIADOS_INTENTOS` con `Retry-After`).
+- Las cuentas de invitado no pueden activarla (`403 CUENTA_INVITADA`).
+- Si una cuenta tiene `dos_factores_activo` pero no tiene secreto (datos antiguos), el inicio de
+  sesión responde `403 SEGUNDO_FACTOR_NO_CONFIGURADO` en vez de omitir el segundo factor.
+- El secreto se guarda en la cuenta para poder validar los códigos. En producción conviene
+  cifrarlo en la base de datos.
 
 ### Cierre de sesión (ACC-03) · requiere JWT
 
@@ -319,7 +381,6 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Configuración de verificación en dos pasos con autenticador (ACC-01), que ACC-02 exigiría.
 - Cerrar las demás sesiones al cambiar o restablecer la contraseña (requiere versionar los tokens
   por cuenta).
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.

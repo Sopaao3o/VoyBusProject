@@ -119,6 +119,28 @@ const cierreSesionBody = z.object({
   }),
 });
 
+// ACC-01 y ACC-02: códigos de 6 dígitos de la aplicación autenticadora (TOTP).
+const codigo2fa = z
+  .string({ error: 'El código de verificación en dos pasos es obligatorio' })
+  .trim()
+  .regex(/^\d{6}$/, 'El código de verificación en dos pasos debe tener 6 dígitos');
+
+const confirmar2faBody = z.object({ codigo: codigo2fa });
+
+const verificar2faBody = z.object({
+  desafio: z
+    .string({ error: 'Falta el desafío de verificación en dos pasos' })
+    .trim()
+    .min(1, 'Falta el desafío de verificación en dos pasos')
+    .max(4000, 'El desafío de verificación en dos pasos no es válido'),
+  codigo: codigo2fa,
+});
+
+const desactivar2faBody = z.object({
+  password_actual: passwordIngreso,
+  codigo: codigo2fa,
+});
+
 // ACC-04: la nueva contraseña exige 8 caracteres con letras y números; el símbolo es
 // recomendado, no obligatorio. El máximo evita cadenas que bcrypt tendría que truncar.
 const passwordNueva = z
@@ -169,4 +191,7 @@ module.exports = {
   recuperacionBody,
   restablecerPasswordBody,
   cambioPasswordBody,
+  confirmar2faBody,
+  verificar2faBody,
+  desactivar2faBody,
 };

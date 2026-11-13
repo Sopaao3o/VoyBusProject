@@ -58,6 +58,44 @@ function createAuthController(
       res.json({ data: await service.verificarContacto(req.datos.body) });
     },
 
+    iniciarDosFactores: async (req, res) => {
+      res.json({ data: await service.iniciarConfiguracion2fa({ sesion: req.auth }) });
+    },
+
+    confirmarDosFactores: async (req, res) => {
+      try {
+        res.json({
+          data: await service.confirmarConfiguracion2fa({
+            sesion: req.auth,
+            ...req.datos.body,
+          }),
+        });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
+    },
+
+    desactivarDosFactores: async (req, res) => {
+      try {
+        res.json({
+          data: await service.desactivar2fa({ sesion: req.auth, ...req.datos.body }),
+        });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
+    },
+
+    verificarDosFactores: async (req, res) => {
+      try {
+        res.json({ data: await service.verificarSegundoFactor(req.datos.body) });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
+    },
+
     registrarInvitado: async (req, res) => {
       res.status(201).json({ data: await service.registrarInvitado() });
     },

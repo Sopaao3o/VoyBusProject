@@ -280,10 +280,11 @@ test('ACC-02: los intentos fallidos vencen después de la ventana', async () => 
 });
 
 test('ACC-02: no omite la verificación en dos pasos si está activada', async () => {
+  // Cuenta con la marca activa pero sin secreto (datos antiguos o corruptos): no se deja entrar.
   const usuario = await crearUsuario({ dosFactores: 1 });
   const { status, body } = await iniciar({ correo: usuario.correo, password: PASSWORD });
 
   assert.equal(status, 403);
-  assert.equal(body.error.code, 'SEGUNDO_FACTOR_REQUERIDO');
+  assert.equal(body.error.code, 'SEGUNDO_FACTOR_NO_CONFIGURADO');
   assert.ok(!body.data);
 });
