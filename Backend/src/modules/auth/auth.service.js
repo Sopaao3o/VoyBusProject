@@ -8,6 +8,15 @@ const { Op } = require('sequelize');
 const { HttpError, conflict, notFound, badRequest } = require('../../utils/httpErrors');
 
 const CODIGO_MINUTOS_POR_DEFECTO = 15;
+const LOGIN_MAX_INTENTOS_POR_DEFECTO = 5;
+const LOGIN_VENTANA_MINUTOS_POR_DEFECTO = 15;
+const LOGIN_BLOQUEO_MINUTOS_POR_DEFECTO = 5;
+
+/** Número positivo desde el entorno, o el valor por defecto. */
+function numeroPositivo(valor, defecto) {
+  const numero = Number(valor);
+  return Number.isFinite(numero) && numero > 0 ? numero : defecto;
+}
 
 /** Secreto de JWT: en producción es obligatorio definirlo en el .env. */
 function secretoJwt() {
@@ -86,6 +95,67 @@ function createAuthService({ sequelize, Usuario }, { ahora = () => new Date() } 
     });
   }
 
+  // ACC-02: intentos fallidos por contacto. Es memoria del proceso, suficiente para el
+  // backend local de un solo proceso; en producción convendría un almacén compartido.
+  const loginMaxIntentos = Math.floor(
+    numeroPositivo(process.env.LOGIN_MAX_INTENTOS, LOGIN_MAX_INTENTOS_POR_DEFECTO),
+  );
+  const loginVentanaMs =
+    numeroPositivo(process.env.LOGIN_VENTANA_MINUTOS, LOGIN_VENTANA_MINUTOS_POR_DEFECTO) * 60_000;
+  const loginBloqueoMs =
+    numeroPositivo(process.env.LOGIN_BLOQUEO_MINUTOS, LOGIN_BLOQUEO_MINUTOS_POR_DEFECTO) * 60_000;
+  const intentosLogin = new Map();
+
+  // Hash de relleno: permite comparar siempre con bcrypt aunque el contacto no exista,
+  // para no revelar por tiempo de respuesta qué credencial falló.
+  const hashDeRelleno = bcrypt.hashSync('voybus-login-sin-usuario', rondasBcrypt());
+
+  function limpiarIntentosVencidos(ahoraMs) {
+    for (const [clave, registro] of intentosLogin) {
+      if (registro.bloqueadoHasta <= ahoraMs && ahoraMs - registro.desde >= loginVentanaMs) {
+        intentosLogin.delete(clave);
+      }
+    }
+  }
+
+  /** Lanza 429 si el contacto está en espera por intentos fallidos repetidos. */
+  function exigirSinBloqueo(clave) {
+    const ahoraMs = ahora().getTime();
+    limpiarIntentosVencidos(ahoraMs);
+    const registro = intentosLogin.get(clave);
+    if (!registro || registro.bloqueadoHasta <= ahoraMs) return;
+
+    const segundos = Math.max(1, Math.ceil((registro.bloqueadoHasta - ahoraMs) / 1000));
+    const error = new HttpError(
+      429,
+      `Demasiados intentos fallidos. Espera ${segundos} segundos e inténtalo de nuevo`,
+      {
+        code: 'DEMASIADOS_INTENTOS',
+        details: [{ campo: 'espera_segundos', mensaje: String(segundos) }],
+      },
+    );
+    // El controlador lo usa para responder con el encabezado Retry-After.
+    error.retryAfterSegundos = segundos;
+    throw error;
+  }
+
+  function registrarIntentoFallido(clave) {
+    const ahoraMs = ahora().getTime();
+    const actual = intentosLogin.get(clave);
+    const registro =
+      actual && actual.bloqueadoHasta <= ahoraMs && ahoraMs - actual.desde < loginVentanaMs
+        ? actual
+        : { fallos: 0, desde: ahoraMs, bloqueadoHasta: 0 };
+
+    registro.fallos += 1;
+    if (registro.fallos >= loginMaxIntentos) {
+      registro.fallos = 0;
+      registro.desde = ahoraMs;
+      registro.bloqueadoHasta = ahoraMs + loginBloqueoMs;
+    }
+    intentosLogin.set(clave, registro);
+  }
+
   return {
     /**
      * Registro público: siempre crea un pasajero, aunque el cuerpo intente enviar otro rol.
@@ -144,6 +214,59 @@ function createAuthService({ sequelize, Usuario }, { ahora = () => new Date() } 
         },
         codigo,
       };
+    },
+
+    /**
+     * ACC-02: inicia sesión con el mismo medio de contacto usado al registrarse.
+     * Ante credenciales incorrectas responde siempre lo mismo, sin decir qué falló.
+     */
+    async iniciarSesion({ correo, telefono, password }) {
+      const clave = correo ? `correo:${correo}` : `telefono:${telefono}`;
+      exigirSinBloqueo(clave);
+
+      const usuario = await Usuario.findOne({ where: correo ? { correo } : { telefono } });
+      const tienePassword = Boolean(usuario?.password_hash);
+      // Se compara siempre (también si no hay cuenta) para no filtrar información por tiempo.
+      const coincide = await bcrypt.compare(password, usuario?.password_hash || hashDeRelleno);
+
+      if (!usuario || !tienePassword || !coincide) {
+        registrarIntentoFallido(clave);
+        throw new HttpError(401, 'El usuario o la contraseña no son correctos', {
+          code: 'CREDENCIALES_INVALIDAS',
+        });
+      }
+
+      // Las credenciales son correctas: los errores de estado no cuentan como intento fallido.
+      intentosLogin.delete(clave);
+
+      if (usuario.estado === 'deshabilitado') {
+        throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+          code: 'CUENTA_DESHABILITADA',
+        });
+      }
+
+      if (usuario.estado === 'sin_verificar') {
+        const canal = usuario.canal_verificacion || (usuario.correo ? 'correo' : 'telefono');
+        const medio = canal === 'correo' ? 'correo electrónico' : 'teléfono';
+        throw new HttpError(
+          403,
+          `Tu cuenta aún no está verificada. Revisa el código que enviamos a tu ${medio} y completa la verificación antes de iniciar sesión`,
+          { code: 'CUENTA_SIN_VERIFICAR' },
+        );
+      }
+
+      // La configuración de 2FA pertenece a ACC-01 y quedó fuera de este alcance: el esquema
+      // no guarda el secreto del autenticador. Si una cuenta lo tuviera activo, no se omite
+      // el segundo factor: se le pide contactar al administrador.
+      if (usuario.dos_factores_activo) {
+        throw new HttpError(
+          403,
+          'Esta cuenta tiene la verificación en dos pasos activada, pero aún no está configurada. Contacta al administrador',
+          { code: 'SEGUNDO_FACTOR_REQUERIDO' },
+        );
+      }
+
+      return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
     },
 
     /** Confirma el código enviado al correo o teléfono y habilita la cuenta. */

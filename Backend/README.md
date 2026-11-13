@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (69)                           |
+| `npm test`             | Ejecuta las pruebas automáticas (82)                           |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -75,11 +75,18 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 
 Para reemplazarlo solo hay que cambiar el cuerpo de esas dos funciones; las rutas ya las usan.
 
-ACC-01 ya emite un JWT (`Authorization: Bearer <token>`) al verificar el contacto y al entrar
-como invitado. Ese token queda listo para que ACC-02 (iniciar sesión) reemplace el placeholder.
+ACC-01 y ACC-02 emiten un JWT (`Authorization: Bearer <token>`) al verificar el contacto, entrar
+como invitado o iniciar sesión. Ese token quedará listo para que las rutas protegidas dejen de
+usar el encabezado `x-user-id` (ver Pendiente).
 
-Usuarios de ejemplo: `1` administrador, `2` Carlos Rojas y `3` María Soto (conductores),
-`4` Luis Pérez (conductor deshabilitado), `5` Ana Pasajera.
+Las cuentas de ejemplo usan la contraseña `Clave123!` y correos `@voybus.cl`; se cargan con
+`npm run db:reset`:
+
+- `1` Admin VoyBus · administrador · `admin@voybus.cl`
+- `2` Carlos Rojas · conductor · `carlos.rojas@voybus.cl`
+- `3` María Soto · conductor · `maria.soto@voybus.cl`
+- `4` Luis Pérez · conductor deshabilitado · `luis.perez@voybus.cl`
+- `5` Ana Pasajera · pasajero · `ana.pasajera@voybus.cl`
 
 ## Endpoints
 
@@ -121,6 +128,36 @@ Cuerpo de `POST /api/v1/auth/verificar-contacto`:
 ```json
 { "correo": "ana@example.com", "codigo": "123456" }
 ```
+
+### Inicio de sesión (ACC-02) · público
+
+| Método y ruta                      | Descripción                                                      |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `POST /api/v1/auth/iniciar-sesion` | Ingresa con el correo o teléfono del registro y devuelve un JWT. |
+
+Cuerpo (un solo medio de contacto y la contraseña):
+
+```json
+{ "correo": "ana@example.com", "password": "Clave123!" }
+```
+
+También se acepta `{ "telefono": "+56912345678", "password": "Clave123!" }`.
+
+La respuesta tiene la misma forma que la verificación de ACC-01:
+`{ "data": { "usuario": ..., "token": ..., "token_type": "Bearer", "expira_en": ... } }`.
+
+Reglas de ACC-02:
+
+- El medio de contacto debe ser el usado al registrarse.
+- Credenciales incorrectas responden `401 CREDENCIALES_INVALIDAS` con un mensaje general que no
+  distingue si falló el contacto o la contraseña.
+- Tras `LOGIN_MAX_INTENTOS` fallos dentro de `LOGIN_VENTANA_MINUTOS`, la cuenta espera
+  `LOGIN_BLOQUEO_MINUTOS` y responde `429 DEMASIADOS_INTENTOS` con el encabezado `Retry-After`.
+- Las cuentas `sin_verificar` responden `403 CUENTA_SIN_VERIFICAR` con instrucciones para
+  completar la verificación; las `deshabilitadas` responden `403 CUENTA_DESHABILITADA`.
+- La configuración de verificación en dos pasos con autenticador quedó fuera de ACC-01. Si una
+  cuenta tiene `dos_factores_activo`, ACC-02 no la deja entrar para no omitir el segundo factor
+  (`403 SEGUNDO_FACTOR_REQUERIDO`).
 
 ### Red de transporte (RED-01, RED-02) · públicos
 
@@ -190,5 +227,7 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Inicio de sesión real (ACC-02) en `src/middleware/auth.js` usando el JWT que ya emite ACC-01.
+- Que las rutas protegidas validen el JWT de ACC-01/ACC-02 en `src/middleware/auth.js` (hoy
+  siguen usando `x-user-id`).
+- Configuración de verificación en dos pasos con autenticador (ACC-01), que ACC-02 exigiría.
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.

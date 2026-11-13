@@ -1,4 +1,8 @@
 // Datos de ejemplo de VoyBus (coordenadas aproximadas de Antofagasta, solo para demostración).
+const bcrypt = require('bcryptjs');
+
+const PASSWORD_DEMO = 'Clave123!';
+
 const LINEAS = [
   { codigo: '103', nombre: 'Costanera – Universidad', color: '#1E5FC9', estado_servicio: 'activa' },
   { codigo: '107', nombre: 'Centro – Terminal Norte', color: '#3D9BE0', estado_servicio: 'activa' },
@@ -56,13 +60,20 @@ const RECORRIDOS = {
   },
 };
 
-// Usuarios de demostración. password_hash queda vacío: el login lo implementa Daslav.
+// Usuarios de demostración. Todos comparten PASSWORD_DEMO y ya están verificados.
 const USUARIOS = [
-  { rol: 'administrador', nombre_visible: 'Admin VoyBus', alias: 'admin', estado: 'habilitado' },
+  {
+    rol: 'administrador',
+    nombre_visible: 'Admin VoyBus',
+    alias: 'admin',
+    correo: 'admin@voybus.cl',
+    estado: 'habilitado',
+  },
   {
     rol: 'conductor',
     nombre_visible: 'Carlos Rojas',
     alias: 'crojas',
+    correo: 'carlos.rojas@voybus.cl',
     estado: 'habilitado',
     identificador: 'COND-001',
   },
@@ -70,6 +81,7 @@ const USUARIOS = [
     rol: 'conductor',
     nombre_visible: 'María Soto',
     alias: 'msoto',
+    correo: 'maria.soto@voybus.cl',
     estado: 'habilitado',
     identificador: 'COND-002',
   },
@@ -77,10 +89,17 @@ const USUARIOS = [
     rol: 'conductor',
     nombre_visible: 'Luis Pérez',
     alias: 'lperez',
+    correo: 'luis.perez@voybus.cl',
     estado: 'deshabilitado',
     identificador: 'COND-003',
   },
-  { rol: 'pasajero', nombre_visible: 'Ana Pasajera', alias: 'ana', estado: 'habilitado' },
+  {
+    rol: 'pasajero',
+    nombre_visible: 'Ana Pasajera',
+    alias: 'ana',
+    correo: 'ana.pasajera@voybus.cl',
+    estado: 'habilitado',
+  },
 ];
 
 const ESTADOS_VEHICULO = {
@@ -125,7 +144,15 @@ async function cargarDatosEjemplo({
     }
   }
 
-  for (const u of USUARIOS) await Usuario.create(u);
+  const passwordHash = await bcrypt.hash(PASSWORD_DEMO, Number(process.env.BCRYPT_ROUNDS) || 10);
+  for (const u of USUARIOS) {
+    await Usuario.create({
+      ...u,
+      password_hash: passwordHash,
+      correo_verificado: 1,
+      terminos_aceptados_en: new Date().toISOString(),
+    });
+  }
 
   for (let i = 1; i <= 10; i++) {
     await Vehiculo.create({

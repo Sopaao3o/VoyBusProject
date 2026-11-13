@@ -67,6 +67,25 @@ const registroBody = z
     }
   });
 
+/** Exige exactamente uno de los dos medios de contacto. */
+function unSoloContacto(datos, ctx) {
+  const contactos = [datos.correo, datos.telefono].filter(Boolean);
+  if (contactos.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['correo'],
+      message: 'Indica el correo o el teléfono con el que te registraste',
+    });
+  }
+  if (contactos.length > 1) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['telefono'],
+      message: 'Indica solo un medio de contacto: el correo o el teléfono',
+    });
+  }
+}
+
 const verificacionBody = z
   .object({
     correo,
@@ -76,22 +95,21 @@ const verificacionBody = z
       .trim()
       .regex(/^\d{6}$/, 'El código de verificación debe tener 6 dígitos'),
   })
-  .superRefine((datos, ctx) => {
-    const contactos = [datos.correo, datos.telefono].filter(Boolean);
-    if (contactos.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['correo'],
-        message: 'Indica el correo o el teléfono con el que te registraste',
-      });
-    }
-    if (contactos.length > 1) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['telefono'],
-        message: 'Indica solo un medio de contacto: el correo o el teléfono',
-      });
-    }
-  });
+  .superRefine(unSoloContacto);
 
-module.exports = { registroBody, verificacionBody };
+// ACC-02: para iniciar sesión no se exige la complejidad de una contraseña nueva,
+// solo que venga escrita. Así una cuenta antigua también puede ingresar.
+const passwordIngreso = z
+  .string({ error: 'La contraseña es obligatoria' })
+  .min(1, 'La contraseña es obligatoria')
+  .max(100, 'La contraseña es demasiado larga');
+
+const sesionBody = z
+  .object({
+    correo,
+    telefono,
+    password: passwordIngreso,
+  })
+  .superRefine(unSoloContacto);
+
+module.exports = { registroBody, verificacionBody, sesionBody };
