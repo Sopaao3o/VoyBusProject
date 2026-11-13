@@ -1,11 +1,17 @@
 // ACC-01: creación de cuentas de pasajero y verificación del medio de contacto.
+// ACC-02: inicio de sesión. ACC-03: cierre de sesión.
 // No incluye Google/Apple ni verificación en dos pasos (fuera del alcance pedido).
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 
 const { HttpError, conflict, notFound, badRequest } = require('../../utils/httpErrors');
+const {
+  firmarToken,
+  verificarToken,
+  huellaToken,
+  tokenDeAutorizacion,
+} = require('../../utils/jwt');
 
 const CODIGO_MINUTOS_POR_DEFECTO = 15;
 const LOGIN_MAX_INTENTOS_POR_DEFECTO = 5;
@@ -16,15 +22,6 @@ const LOGIN_BLOQUEO_MINUTOS_POR_DEFECTO = 5;
 function numeroPositivo(valor, defecto) {
   const numero = Number(valor);
   return Number.isFinite(numero) && numero > 0 ? numero : defecto;
-}
-
-/** Secreto de JWT: en producción es obligatorio definirlo en el .env. */
-function secretoJwt() {
-  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET es obligatorio cuando NODE_ENV=production');
-  }
-  return 'voybus-dev-secret-no-usar-en-produccion';
 }
 
 const rondasBcrypt = () => Number(process.env.BCRYPT_ROUNDS) || 10;
@@ -52,21 +49,14 @@ function generarCodigo() {
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 }
 
-function firmarToken(usuario) {
-  const token = jwt.sign(
-    { sub: String(usuario.id), rol: usuario.rol, tipo_acceso: usuario.tipo_acceso },
-    secretoJwt(),
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
-  );
-  const { exp } = jwt.decode(token);
-  return { token, token_type: 'Bearer', expira_en: new Date(exp * 1000).toISOString() };
-}
-
 /**
  * @param {ReturnType<import('../../database/models').initModels>} models
  * @param {{ ahora?: () => Date }} [opciones] `ahora` permite controlar el reloj en las pruebas
  */
-function createAuthService({ sequelize, Usuario }, { ahora = () => new Date() } = {}) {
+function createAuthService(
+  { sequelize, Usuario, TokenRevocado },
+  { ahora = () => new Date() } = {},
+) {
   /** Busca una cuenta que ya use el correo o el teléfono y explica cuál chocó. */
   async function exigirContactoLibre(correo, telefono, transaction) {
     const condiciones = [];
@@ -267,6 +257,68 @@ function createAuthService({ sequelize, Usuario }, { ahora = () => new Date() } 
       }
 
       return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
+    },
+
+    /**
+     * ACC-03: cierra la sesión del token recibido. Es idempotente para que reintentar (o
+     * cerrar sesión dos veces) nunca falle, y no toca el perfil, los favoritos ni el historial.
+     */
+    async cerrarSesion({ autorizacion }) {
+      const token = tokenDeAutorizacion(autorizacion);
+      if (!token) {
+        // Distingue "no envió sesión" de "envió un encabezado con otro formato".
+        if (!autorizacion) {
+          throw new HttpError(401, 'Falta el token de la sesión que quieres cerrar', {
+            code: 'NO_AUTENTICADO',
+          });
+        }
+        throw new HttpError(401, 'El encabezado Authorization debe ser "Bearer <token>"', {
+          code: 'TOKEN_INVALIDO',
+        });
+      }
+
+      let payload;
+      try {
+        payload = verificarToken(token);
+      } catch (error) {
+        // Un token expirado ya no da acceso: la sesión está cerrada y el reintento es seguro.
+        if (error.name === 'TokenExpiredError') {
+          return {
+            sesion_cerrada: true,
+            ya_estaba_cerrada: true,
+            cerrada_en: ahora().toISOString(),
+          };
+        }
+        throw new HttpError(401, 'El token de sesión no es válido', { code: 'TOKEN_INVALIDO' });
+      }
+
+      const usuarioId = Number(payload.sub);
+      if (!Number.isInteger(usuarioId) || usuarioId <= 0 || !Number.isFinite(payload.exp)) {
+        throw new HttpError(401, 'El token de sesión no es válido', { code: 'TOKEN_INVALIDO' });
+      }
+
+      // Limpieza oportunista: las huellas de tokens vencidos ya no hacen falta.
+      await TokenRevocado.destroy({ where: { expira_en: { [Op.lte]: ahora().toISOString() } } });
+
+      const tokenHash = huellaToken(token);
+      const yaRevocado = await TokenRevocado.findByPk(tokenHash);
+      if (yaRevocado) {
+        return {
+          sesion_cerrada: true,
+          ya_estaba_cerrada: true,
+          cerrada_en: yaRevocado.revocado_en,
+        };
+      }
+
+      const cerradaEn = ahora().toISOString();
+      await TokenRevocado.create({
+        token_hash: tokenHash,
+        usuario_id: Number(payload.sub),
+        expira_en: new Date(payload.exp * 1000).toISOString(),
+        revocado_en: cerradaEn,
+      });
+
+      return { sesion_cerrada: true, ya_estaba_cerrada: false, cerrada_en: cerradaEn };
     },
 
     /** Confirma el código enviado al correo o teléfono y habilita la cuenta. */

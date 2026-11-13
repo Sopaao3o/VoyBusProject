@@ -1,4 +1,4 @@
-// Esquemas Zod de ACC-01: registro de pasajero y verificación del contacto.
+// Esquemas Zod de ACC-01 (registro y verificación), ACC-02 (inicio de sesión) y ACC-03 (cierre).
 const { z } = require('zod');
 
 /** Convierte los campos de texto vacíos en "no enviados" (útil cuando el formulario usa uno u otro). */
@@ -112,4 +112,11 @@ const sesionBody = z
   })
   .superRefine(unSoloContacto);
 
-module.exports = { registroBody, verificacionBody, sesionBody };
+// ACC-03: la confirmación explícita evita cierres de sesión accidentales.
+const cierreSesionBody = z.object({
+  confirmar: z.literal(true, {
+    error: 'Debes confirmar que quieres cerrar la sesión',
+  }),
+});
+
+module.exports = { registroBody, verificacionBody, sesionBody, cierreSesionBody };

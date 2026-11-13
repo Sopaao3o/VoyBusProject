@@ -1,4 +1,4 @@
-// Los controllers de ACC-01 y ACC-02 reciben la petición ya validada y arman la respuesta pública.
+// Los controllers de ACC-01, ACC-02 y ACC-03 reciben la petición ya validada y arman la respuesta.
 function createAuthController(service, { exponerCodigoVerificacion = false } = {}) {
   return {
     registrar: async (req, res) => {
@@ -18,6 +18,10 @@ function createAuthController(service, { exponerCodigoVerificacion = false } = {
         if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
         throw error;
       }
+    },
+
+    cerrarSesion: async (req, res) => {
+      res.json({ data: await service.cerrarSesion({ autorizacion: req.headers.authorization }) });
     },
 
     verificarContacto: async (req, res) => {

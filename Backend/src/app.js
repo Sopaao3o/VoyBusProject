@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const healthRoutes = require('./routes/health.routes');
+const { crearAutenticacion } = require('./middleware/auth');
 const { createAuthService } = require('./modules/auth/auth.service');
 const { createAuthController } = require('./modules/auth/auth.controller');
 const { createAuthRoutes } = require('./modules/auth/auth.routes');
@@ -51,13 +52,18 @@ function createApp({
     exponerCodigoVerificacion,
   });
   const v1 = express.Router();
+  const autenticar = crearAutenticacion({ models });
   v1.use('/auth', createAuthRoutes(auth));
   v1.use(createRedRoutes(createRedController(createRedService(models))));
-  v1.use('/admin', createTurnosRoutes(createTurnosController(createTurnosService(models))));
-  v1.use('/admin', createConductorAdminRoutes(conductor));
-  v1.use('/conductor', createConductorRoutes(conductor));
+  v1.use(
+    '/admin',
+    autenticar,
+    createTurnosRoutes(createTurnosController(createTurnosService(models))),
+  );
+  v1.use('/admin', autenticar, createConductorAdminRoutes(conductor));
+  v1.use('/conductor', autenticar, createConductorRoutes(conductor));
   const viajes = createViajesController(createViajesService(models, { ahora }));
-  v1.use('/viajes', createViajesRoutes(viajes));
+  v1.use('/viajes', autenticar, createViajesRoutes(viajes));
   if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));
   app.use('/api/v1', v1);
 

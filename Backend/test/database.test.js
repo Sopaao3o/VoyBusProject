@@ -17,11 +17,11 @@ test.after(() => sequelize.close());
 
 const consulta = async (sql) => (await sequelize.query(sql))[0];
 
-test('Las migraciones crean las 15 tablas y la configuración inicial', async () => {
+test('Las migraciones crean las 16 tablas y la configuración inicial', async () => {
   const tablas = await consulta(
     `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> 'SequelizeMeta'`,
   );
-  assert.equal(tablas.length, 15);
+  assert.equal(tablas.length, 16);
   const [cfg] = await consulta('SELECT margen_tolerancia_min AS m FROM configuracion_sistema');
   assert.equal(cfg.m, 5);
 });

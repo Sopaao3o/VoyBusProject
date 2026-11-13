@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (82)                           |
+| `npm test`             | Ejecuta las pruebas automáticas (90)                           |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -62,22 +62,25 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 
 - Prefijo `/api/v1`. Las respuestas correctas son `{ "data": ..., "meta": ... }`.
 - Los errores son `{ "error": { "code", "message", "details" } }` con estos códigos:
-  `400 SOLICITUD_INVALIDA / VALIDACION`, `401 NO_AUTENTICADO`, `403 SIN_PERMISO`,
-  `404 NO_ENCONTRADO`, `409 CONFLICTO`.
+  `400 SOLICITUD_INVALIDA / VALIDACION`, `401 NO_AUTENTICADO / TOKEN_INVALIDO / SESION_CERRADA`,
+  `403 SIN_PERMISO`, `404 NO_ENCONTRADO`, `409 CONFLICTO`, `429 DEMASIADOS_INTENTOS`.
 - Las fechas se guardan y envían en formato ISO 8601.
 
-## Autenticación (provisoria)
+## Autenticación
 
-`src/middleware/auth.js` es un placeholder mientras se implementan las sesiones:
+ACC-01, ACC-02 y ACC-03 emiten y cierran JWT (`Authorization: Bearer <token>`). En
+`src/middleware/auth.js`:
 
-- `requireRole(...roles)` deja pasar todo.
-- `usuarioActual(req)` lee el encabezado `x-user-id` (401 si falta).
+- `crearAutenticacion({ models })` valida el JWT en las rutas privadas (`/admin`, `/conductor` y
+  `/viajes`). Un token inválido, expirado o cerrado responde `401`; el válido deja la identidad en
+  `req.auth`.
+- `requireRole(...roles)` comprueba `req.auth.rol` cuando hay token.
+- `usuarioActual(req)` usa `req.auth` y, si no hay token, cae en el encabezado `x-user-id`
+  (compatibilidad provisional con las pruebas y el frontend actual; ver Pendiente).
 
-Para reemplazarlo solo hay que cambiar el cuerpo de esas dos funciones; las rutas ya las usan.
-
-ACC-01 y ACC-02 emiten un JWT (`Authorization: Bearer <token>`) al verificar el contacto, entrar
-como invitado o iniciar sesión. Ese token quedará listo para que las rutas protegidas dejen de
-usar el encabezado `x-user-id` (ver Pendiente).
+Al cerrar sesión se guarda la huella SHA-256 del token en `sesiones_revocadas` hasta que expira,
+así que el token deja de servir también después de reiniciar el servidor. No se borra nada de la
+cuenta: perfil, favoritos e historial se conservan.
 
 Las cuentas de ejemplo usan la contraseña `Clave123!` y correos `@voybus.cl`; se cargan con
 `npm run db:reset`:
@@ -159,6 +162,45 @@ Reglas de ACC-02:
   cuenta tiene `dos_factores_activo`, ACC-02 no la deja entrar para no omitir el segundo factor
   (`403 SEGUNDO_FACTOR_REQUERIDO`).
 
+### Cierre de sesión (ACC-03) · requiere JWT
+
+| Método y ruta                     | Descripción                                      |
+| --------------------------------- | ------------------------------------------------ |
+| `POST /api/v1/auth/cerrar-sesion` | Cierra la sesión del token y lo deja sin acceso. |
+
+Encabezado `Authorization: Bearer <token>` y cuerpo con la confirmación explícita:
+
+```json
+{ "confirmar": true }
+```
+
+Respuesta `200`:
+
+```json
+{
+  "data": {
+    "sesion_cerrada": true,
+    "ya_estaba_cerrada": false,
+    "cerrada_en": "2026-11-13T12:00:00.000Z"
+  }
+}
+```
+
+Reglas de ACC-03:
+
+- `confirmar: true` es obligatorio; sin él responde `400 VALIDACION` en `body.confirmar`.
+- Sin `Authorization` responde `401 NO_AUTENTICADO`; con un encabezado mal formado o un token con
+  firma inválida responde `401 TOKEN_INVALIDO`.
+- Es idempotente: cerrar dos veces (o con un token ya vencido) responde `200` con
+  `ya_estaba_cerrada: true`. Así el reintento tras un fallo de conexión nunca deja un error.
+- El token cerrado responde `401 SESION_CERRADA` en cualquier ruta privada, aunque el cliente
+  vuelva con el botón "atrás"; la huella queda guardada en `sesiones_revocadas` hasta su
+  expiración.
+- Solo se cierra la sesión de ese token: otros inicios de sesión de la misma cuenta siguen
+  vigentes. No se elimina el perfil, ni los favoritos, ni el historial.
+- La confirmación en pantalla y el borrado del token en el dispositivo pertenecen al frontend de
+  ACC-03 (aún no implementado).
+
 ### Red de transporte (RED-01, RED-02) · públicos
 
 | Método y ruta                | Descripción                                                                          |
@@ -227,7 +269,7 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Que las rutas protegidas validen el JWT de ACC-01/ACC-02 en `src/middleware/auth.js` (hoy
-  siguen usando `x-user-id`).
+- Que las rutas protegidas exijan siempre un JWT: hoy, si no viene `Authorization`, todavía
+  aceptan el encabezado de desarrollo `x-user-id`.
 - Configuración de verificación en dos pasos con autenticador (ACC-01), que ACC-02 exigiría.
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.
