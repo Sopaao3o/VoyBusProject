@@ -6,6 +6,7 @@ const { createDatabase } = require('../src/config/database');
 const { createMigrator } = require('../src/database/migrator');
 const { initModels } = require('../src/database/models');
 const { cargarDatosEjemplo } = require('../src/database/seeders/datos-ejemplo');
+const { tokenPara } = require('./auth-helpers');
 
 let server, base, sequelize, models;
 let reloj = new Date('2026-12-01T08:00:00Z'); // hora "actual" controlada por las pruebas
@@ -30,9 +31,11 @@ test.after(async () => {
 
 // conductor 2 = Carlos, conductor 3 = María, 1 = admin, 5 = pasajera
 const call = async (method, path, { as = 2, body } = {}) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (as) headers.Authorization = `Bearer ${tokenPara(as)}`;
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(as ? { 'x-user-id': String(as) } : {}) },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, body: await res.json() };

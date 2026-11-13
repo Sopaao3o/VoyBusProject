@@ -1,12 +1,11 @@
 // Autenticación de las rutas privadas con el JWT que emiten ACC-01, ACC-02 y ACC-03.
-// Las pruebas y el frontend antiguo todavía pueden usar "x-user-id"; cuando el encabezado
-// Authorization viene, el token manda y un token cerrado ya no da acceso.
+// Toda ruta protegida exige "Authorization: Bearer <token>"; ya no se acepta x-user-id.
 const { HttpError } = require('../utils/httpErrors');
 const { verificarToken, huellaToken, tokenDeAutorizacion } = require('../utils/jwt');
 
 /**
  * Middleware para las rutas privadas.
- * - Sin `Authorization`: deja pasar (compatibilidad provisional con `x-user-id`).
+ * - Sin `Authorization`: responde 401 NO_AUTENTICADO.
  * - Con un JWT válido: guarda la identidad en `req.auth`.
  * - Con un JWT inválido, expirado o cerrado: responde 401.
  */
@@ -14,15 +13,12 @@ function crearAutenticacion({ models }) {
   const { TokenRevocado } = models;
 
   return async (req, _res, next) => {
-    if (!req.headers.authorization) return next();
-
     const token = tokenDeAutorizacion(req.headers.authorization);
     if (!token) {
-      return next(
-        new HttpError(401, 'El encabezado Authorization debe ser "Bearer <token>"', {
-          code: 'TOKEN_INVALIDO',
-        }),
-      );
+      const mensaje = req.headers.authorization
+        ? 'El encabezado Authorization debe ser "Bearer <token>"'
+        : 'Falta la sesión. Envía el encabezado Authorization: Bearer <token>';
+      return next(new HttpError(401, mensaje, { code: 'NO_AUTENTICADO' }));
     }
 
     let payload;
@@ -57,8 +53,9 @@ function crearAutenticacion({ models }) {
 
 function requireRole(...roles) {
   return (req, res, next) => {
-    // Sin token se mantiene el comportamiento provisional (las pruebas usan x-user-id).
-    if (!req.auth) return next();
+    if (!req.auth) {
+      return next(new HttpError(401, 'Falta la sesión', { code: 'NO_AUTENTICADO' }));
+    }
     if (!roles.includes(req.auth.rol)) {
       return next(
         new HttpError(403, 'No tienes permiso para esta acción', { code: 'SIN_PERMISO' }),
@@ -68,18 +65,12 @@ function requireRole(...roles) {
   };
 }
 
-/**
- * Devuelve el id del usuario que hace la petición: primero el JWT y, si no vino,
- * el encabezado "x-user-id" (solo para desarrollo y pruebas).
- */
+/** Devuelve el id del usuario autenticado por el JWT. */
 function usuarioActual(req) {
-  if (req.auth) return req.auth.usuarioId;
-
-  const id = Number(req.headers['x-user-id']);
-  if (!Number.isInteger(id) || id <= 0) {
-    throw new HttpError(401, 'No se pudo identificar al usuario (falta el encabezado x-user-id)');
+  if (!req.auth) {
+    throw new HttpError(401, 'Falta la sesión', { code: 'NO_AUTENTICADO' });
   }
-  return id;
+  return req.auth.usuarioId;
 }
 
 module.exports = { crearAutenticacion, requireRole, usuarioActual };

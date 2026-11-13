@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (100)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (101)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -71,12 +71,16 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 ACC-01, ACC-02 y ACC-03 emiten, validan y cierran JWT (`Authorization: Bearer <token>`); ACC-04
 usa ese mismo token para cambiar la contraseña. En `src/middleware/auth.js`:
 
-- `crearAutenticacion({ models })` valida el JWT en las rutas privadas (`/admin`, `/conductor` y
-  `/viajes`). Un token inválido, expirado o cerrado responde `401`; el válido deja la identidad en
-  `req.auth`.
-- `requireRole(...roles)` comprueba `req.auth.rol` cuando hay token.
-- `usuarioActual(req)` usa `req.auth` y, si no hay token, cae en el encabezado `x-user-id`
-  (compatibilidad provisional con las pruebas y el frontend actual; ver Pendiente).
+- `crearAutenticacion({ models })` exige el JWT en las rutas privadas (`/admin`, `/conductor` y
+  `/viajes`). Sin `Authorization` responde `401 NO_AUTENTICADO`; un token inválido, expirado o
+  cerrado responde `401`; el válido deja la identidad en `req.auth`.
+- `requireRole(...roles)` exige que `req.auth.rol` esté entre los roles permitidos
+  (`403 SIN_PERMISO`).
+- `usuarioActual(req)` devuelve el `usuarioId` del token; ya no existe el encabezado `x-user-id`.
+
+El frontend debe enviar `Authorization: Bearer <token>` en todas las rutas privadas. Las cuentas
+de ejemplo del selector de usuario todavía no tienen token: hasta que exista el login de ACC-02 en
+la app, esas pantallas responderán `401`.
 
 Al cerrar sesión se guarda la huella SHA-256 del token en `sesiones_revocadas` hasta que expira,
 así que el token deja de servir también después de reiniciar el servidor. No se borra nada de la
@@ -315,8 +319,6 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Que las rutas protegidas exijan siempre un JWT: hoy, si no viene `Authorization`, todavía
-  aceptan el encabezado de desarrollo `x-user-id`.
 - Configuración de verificación en dos pasos con autenticador (ACC-01), que ACC-02 exigiría.
 - Cerrar las demás sesiones al cambiar o restablecer la contraseña (requiere versionar los tokens
   por cuenta).
