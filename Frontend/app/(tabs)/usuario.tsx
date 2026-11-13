@@ -1,19 +1,33 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { USUARIOS_PRUEBA, useUsuario } from '../../src/session/UsuarioContext';
+import { Boton } from '../../src/components/Formulario';
+import { useUsuario } from '../../src/session/UsuarioContext';
 import { colors } from '../../src/theme/colors';
 
 // Selector de usuario de prueba: reemplaza al login hasta que Daslav lo implemente.
+// ACC-01 agrega aquí las cuentas de pasajero creadas en la app.
 export default function UsuarioScreen() {
-  const { usuario, cambiarUsuario } = useUsuario();
+  const router = useRouter();
+  const { usuario, usuarios, cambiarUsuario } = useUsuario();
 
   return (
-    <View style={styles.pantalla}>
-      <Text style={styles.titulo}>Usuario de prueba</Text>
+    <ScrollView contentContainerStyle={styles.pantalla}>
+      <Text style={styles.titulo}>Tu cuenta</Text>
       <Text style={styles.ayuda}>
-        Aún no hay inicio de sesión. Elige con qué usuario de ejemplo quieres usar la app.
+        Aún no hay inicio de sesión. Elige un usuario de ejemplo o crea una cuenta de pasajero.
       </Text>
-      {USUARIOS_PRUEBA.map((u) => {
+
+      <View style={styles.actual}>
+        <Text style={styles.actualEtiqueta}>Sesión actual</Text>
+        <Text style={styles.actualNombre}>{usuario.nombre}</Text>
+        <Text style={styles.rol}>{usuario.rol}</Text>
+      </View>
+
+      <Boton titulo="Crear cuenta de pasajero" onPress={() => router.push('/registro')} />
+
+      <Text style={styles.subtitulo}>Cambiar de usuario</Text>
+      {usuarios.map((u) => {
         const activo = u.id === usuario.id;
         return (
           <Pressable
@@ -28,14 +42,23 @@ export default function UsuarioScreen() {
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: colors.background, padding: 16, gap: 10 },
+  pantalla: { padding: 16, gap: 10, paddingBottom: 40 },
   titulo: { fontSize: 20, fontWeight: '700', color: colors.text },
+  subtitulo: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 10 },
   ayuda: { color: colors.textMuted, marginBottom: 6 },
+  actual: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 4,
+  },
+  actualEtiqueta: { fontSize: 12, fontWeight: '600', color: colors.surface, opacity: 0.8 },
+  actualNombre: { fontSize: 18, fontWeight: '700', color: colors.surface, marginTop: 2 },
   opcion: {
     backgroundColor: colors.surface,
     borderColor: colors.border,

@@ -9,6 +9,9 @@ const { cargarDatosEjemplo } = require('./database/seeders/datos-ejemplo');
 const PORT = Number(process.env.PORT) || 3000;
 
 async function iniciar() {
+  if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET es obligatorio cuando NODE_ENV=production');
+  }
   const sequelize = createDatabase();
   await sequelize.query('PRAGMA journal_mode = WAL;');
   await createMigrator(sequelize).up(); // crea o actualiza las tablas al arrancar

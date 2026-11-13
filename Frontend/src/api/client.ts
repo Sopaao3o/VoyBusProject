@@ -34,6 +34,13 @@ export function fijarUsuario(id: number | null) {
   usuarioId = id;
 }
 
+// JWT emitido por ACC-01 al verificar el contacto o entrar como invitado.
+// Queda listo para cuando el backend reemplace el encabezado x-user-id por el token.
+let token: string | null = null;
+export function fijarToken(nuevo: string | null) {
+  token = nuevo;
+}
+
 interface Respuesta<T> {
   data: T;
   meta?: Record<string, unknown>;
@@ -46,6 +53,7 @@ export async function api<T>(
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (opciones.body !== undefined) headers['Content-Type'] = 'application/json';
   if (usuarioId !== null) headers['x-user-id'] = String(usuarioId);
+  if (token !== null) headers.Authorization = `Bearer ${token}`;
 
   let res: Response;
   try {

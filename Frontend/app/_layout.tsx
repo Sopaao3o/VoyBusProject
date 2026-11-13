@@ -16,6 +16,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
         <Stack.Screen name="linea/[id]" options={{ title: 'Línea' }} />
         <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero' }} />
         <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />

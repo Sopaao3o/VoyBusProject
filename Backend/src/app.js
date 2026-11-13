@@ -4,6 +4,9 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const healthRoutes = require('./routes/health.routes');
+const { createAuthService } = require('./modules/auth/auth.service');
+const { createAuthController } = require('./modules/auth/auth.controller');
+const { createAuthRoutes } = require('./modules/auth/auth.routes');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
@@ -26,8 +29,15 @@ const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
  * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
+ * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
  */
-function createApp({ models, registro = false, ahora, simulador = false }) {
+function createApp({
+  models,
+  registro = false,
+  ahora,
+  simulador = false,
+  exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
+}) {
   const app = express();
 
   app.use(cors());
@@ -37,7 +47,11 @@ function createApp({ models, registro = false, ahora, simulador = false }) {
   app.use('/api/health', healthRoutes);
 
   const conductor = createConductorController(createConductorService(models, { ahora }));
+  const auth = createAuthController(createAuthService(models, { ahora }), {
+    exponerCodigoVerificacion,
+  });
   const v1 = express.Router();
+  v1.use('/auth', createAuthRoutes(auth));
   v1.use(createRedRoutes(createRedController(createRedService(models))));
   v1.use('/admin', createTurnosRoutes(createTurnosController(createTurnosService(models))));
   v1.use('/admin', createConductorAdminRoutes(conductor));

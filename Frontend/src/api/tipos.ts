@@ -191,3 +191,56 @@ export interface ParaderosDisponibles {
   paraderos: ParaderoDeRecorrido[];
   mi_solicitud: SolicitudParada | null;
 }
+
+// ───── ACC-01: registro de pasajero ─────
+
+export type CanalVerificacion = 'correo' | 'telefono';
+
+/** Cuenta tal como la devuelve la API (sin contraseña ni código). */
+export interface UsuarioSesion {
+  id: number;
+  nombre: string;
+  correo: string | null;
+  telefono: string | null;
+  rol: Rol;
+  estado: string;
+  tipo_acceso: string;
+  correo_verificado: boolean;
+  telefono_verificado: boolean;
+  fecha_registro: string;
+}
+
+export interface RegistroPasajeroBody {
+  nombre: string;
+  correo?: string;
+  telefono?: string;
+  password: string;
+  confirmacion: string;
+  acepta_terminos: true;
+}
+
+export interface VerificacionPendiente {
+  requerida: boolean;
+  canal: CanalVerificacion;
+  expira_en: string;
+  /** Solo en desarrollo: el backend no tiene servicio de correo/SMS todavía. */
+  codigo_desarrollo?: string;
+}
+
+export interface RegistroPasajeroRespuesta {
+  usuario: UsuarioSesion;
+  verificacion: VerificacionPendiente;
+}
+
+export interface VerificarContactoBody {
+  correo?: string;
+  telefono?: string;
+  codigo: string;
+}
+
+export interface SesionAutenticada {
+  usuario: UsuarioSesion;
+  token: string;
+  token_type: 'Bearer';
+  expira_en: string;
+}

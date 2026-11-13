@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (54)                           |
+| `npm test`             | Ejecuta las pruebas automáticas (69)                           |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -45,6 +45,7 @@ Backend/
 │   │   ├── auth.js             # PLACEHOLDER de autenticación (ver más abajo)
 │   │   └── validar.js          # valida params, query y body con Zod
 │   ├── modules/
+│   │   ├── auth/               # ACC-01
 │   │   ├── red/                # RED-01 y RED-02
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
@@ -74,10 +75,52 @@ las rutas validan, el controlador responde y el servicio guarda las reglas de ne
 
 Para reemplazarlo solo hay que cambiar el cuerpo de esas dos funciones; las rutas ya las usan.
 
+ACC-01 ya emite un JWT (`Authorization: Bearer <token>`) al verificar el contacto y al entrar
+como invitado. Ese token queda listo para que ACC-02 (iniciar sesión) reemplace el placeholder.
+
 Usuarios de ejemplo: `1` administrador, `2` Carlos Rojas y `3` María Soto (conductores),
 `4` Luis Pérez (conductor deshabilitado), `5` Ana Pasajera.
 
 ## Endpoints
+
+### Registro de pasajero (ACC-01) · público
+
+| Método y ruta                          | Descripción                                                            |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| `POST /api/v1/auth/registro`           | Crea una cuenta de pasajero y envía un código al contacto (ver abajo). |
+| `POST /api/v1/auth/verificar-contacto` | Confirma el código, habilita la cuenta y devuelve un JWT.              |
+| `POST /api/v1/auth/invitado`           | Crea una cuenta temporal de pasajero invitado y devuelve un JWT.       |
+
+Cuerpo de `POST /api/v1/auth/registro`:
+
+```json
+{
+  "nombre": "Ana Pérez",
+  "correo": "ana@example.com",
+  "password": "Clave123!",
+  "confirmacion": "Clave123!",
+  "acepta_terminos": true
+}
+```
+
+También se acepta `"telefono": "+56912345678"` en lugar de `correo` (o ambos; se verifica el
+correo si está presente). Reglas de ACC-01:
+
+- Correo o teléfono no pueden repetir una cuenta existente (409 `CUENTA_DUPLICADA`).
+- Contraseña de 8 a 15 caracteres con mayúscula, minúscula, número y símbolo.
+- La confirmación debe coincidir y los términos de privacidad son obligatorios.
+- El registro público siempre crea `rol: "pasajero"`; cualquier `rol` enviado se ignora.
+- La cuenta queda `sin_verificar` hasta confirmar el código de 6 dígitos.
+
+En desarrollo (`NODE_ENV` distinto de `production`) la respuesta incluye
+`data.verificacion.codigo_desarrollo` para poder probar sin un servicio de correo/SMS.
+En producción ese código se enviaría al contacto y no se expondría en la respuesta.
+
+Cuerpo de `POST /api/v1/auth/verificar-contacto`:
+
+```json
+{ "correo": "ana@example.com", "codigo": "123456" }
+```
 
 ### Red de transporte (RED-01, RED-02) · públicos
 
@@ -147,5 +190,5 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 
 ## Pendiente
 
-- Autenticación real (sesiones) en `src/middleware/auth.js`.
+- Inicio de sesión real (ACC-02) en `src/middleware/auth.js` usando el JWT que ya emite ACC-01.
 - Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.
