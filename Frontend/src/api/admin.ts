@@ -1,7 +1,9 @@
 import { api } from './client';
 import type {
+  CambioEstadoVehiculo,
   Configuracion,
   ConductorOpcion,
+  Incidencia,
   TurnoDetalle,
   TurnoNuevo,
   TurnoResumen,
@@ -36,3 +38,17 @@ export const actualizarMargen = (margen_tolerancia_min: number) =>
     method: 'PUT',
     body: { margen_tolerancia_min },
   }).then((r) => r.data);
+
+// VEH-03: incidencias y cambios de estado registrados por los conductores.
+export const listarIncidencias = (filtro: { turnoId?: number; vehiculoId?: number } = {}) => {
+  const parametros = [
+    filtro.turnoId && `turno_id=${filtro.turnoId}`,
+    filtro.vehiculoId && `vehiculo_id=${filtro.vehiculoId}`,
+  ].filter(Boolean);
+  return api<Incidencia[]>(
+    `/admin/incidencias${parametros.length ? `?${parametros.join('&')}` : ''}`,
+  ).then((r) => r.data);
+};
+
+export const historialDeVehiculo = (vehiculoId: number) =>
+  api<CambioEstadoVehiculo[]>(`/admin/vehiculos/${vehiculoId}/historial`).then((r) => r.data);

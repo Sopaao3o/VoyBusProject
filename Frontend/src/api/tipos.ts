@@ -307,3 +307,28 @@ export interface RespuestaCambioPassword {
   token_type: 'Bearer';
   expira_en: string;
 }
+
+// ───── VEH-03: lo que informan los conductores, visto por el administrador ─────
+
+export interface Incidencia {
+  id: number;
+  conductor_id: number;
+  conductor_nombre: string;
+  vehiculo_id: number;
+  vehiculo_identificador: string;
+  turno_id: number;
+  tipo: 'vehiculo' | 'recorrido';
+  descripcion: string;
+  fecha: string;
+}
+
+export interface CambioEstadoVehiculo {
+  id: number;
+  vehiculo_id: number;
+  responsable_id: number;
+  responsable_nombre: string;
+  estado_anterior: string;
+  estado_nuevo: string;
+  motivo: string | null;
+  fecha: string;
+}

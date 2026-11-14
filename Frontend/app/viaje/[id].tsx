@@ -92,7 +92,8 @@ export default function ViajeScreen() {
             {presentar(solicitud).texto}
           </Text>
           <Text style={styles.dato}>
-            Destino: {solicitud.paradero.nombre} · enviada a las {horaLocal(solicitud.creada_en)}
+            Destino: {solicitud.paradero.nombre} ({solicitud.paradero.codigo}) · enviada a las{' '}
+            {horaLocal(solicitud.creada_en)}
           </Text>
         </View>
       )}
@@ -113,10 +114,18 @@ export default function ViajeScreen() {
               onPress={() => setElegido(p.id)}
               accessibilityRole="radio"
               accessibilityState={{ selected: activo }}
+              accessibilityLabel={`Paradero ${p.orden}: ${p.nombre}, código ${p.codigo}`}
               style={[styles.paradero, activo && styles.paraderoActivo]}
             >
               <Text style={[styles.orden, activo && styles.ordenActivo]}>{p.orden}</Text>
-              <Text style={[styles.paraderoNombre, activo && styles.textoActivo]}>{p.nombre}</Text>
+              <View style={styles.paraderoTextos}>
+                <Text style={[styles.paraderoNombre, activo && styles.textoActivo]}>
+                  {p.nombre}
+                </Text>
+                <Text style={[styles.paraderoCodigo, activo && styles.textoActivo]}>
+                  {p.codigo}
+                </Text>
+              </View>
             </Pressable>
           );
         })
@@ -174,7 +183,9 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   paraderoActivo: { backgroundColor: colors.primary, borderColor: colors.primary },
-  paraderoNombre: { flex: 1, fontSize: 15, color: colors.text },
+  paraderoTextos: { flex: 1, gap: 2 },
+  paraderoNombre: { fontSize: 15, color: colors.text },
+  paraderoCodigo: { fontSize: 12, color: colors.textMuted },
   textoActivo: { color: colors.surface },
   orden: {
     width: 26,

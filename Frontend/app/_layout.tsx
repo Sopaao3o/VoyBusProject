@@ -6,8 +6,15 @@ import { UsuarioProvider, useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
 // Pantallas que solo se pueden ver con sesión iniciada (ACC-03).
-const PANTALLAS_PRIVADAS = ['turno', 'conductor', 'viaje', 'cambiar-password', 'dos-factores'];
-const PESTANAS_PRIVADAS = ['turnos', 'mis-turnos', 'viajar'];
+const PANTALLAS_PRIVADAS = [
+  'turno',
+  'conductor',
+  'viaje',
+  'vehiculo',
+  'cambiar-password',
+  'dos-factores',
+];
+const PESTANAS_PRIVADAS = ['turnos', 'flota', 'mis-turnos', 'viajar'];
 
 function Navegacion() {
   const router = useRouter();
@@ -46,6 +53,7 @@ function Navegacion() {
       <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero' }} />
       <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
       <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
+      <Stack.Screen name="vehiculo/[id]" options={{ title: 'Vehículo' }} />
       <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
       <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
       <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />

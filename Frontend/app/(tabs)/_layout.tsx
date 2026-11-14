@@ -59,6 +59,17 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* VEH-03: incidencias y estado de los vehículos, solo para el administrador. */}
+      <Tabs.Screen
+        name="flota"
+        options={{
+          title: 'Flota',
+          href: esAdmin ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="construct-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
       {/* VEH-03: solo el conductor ve esta pestaña. */}
       <Tabs.Screen
         name="mis-turnos"

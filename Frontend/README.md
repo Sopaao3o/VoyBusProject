@@ -50,12 +50,12 @@ Las líneas y los paraderos se consultan sin cuenta. Lo demás exige iniciar ses
 
 Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña `Clave123!`:
 
-| Rol           | Correo                   | Pestañas que ve                       |
-| ------------- | ------------------------ | ------------------------------------- |
-| Pasajero      | `ana.pasajera@voybus.cl` | Líneas, Paraderos, Viajar, Cuenta     |
-| Conductor     | `carlos.rojas@voybus.cl` | Líneas, Paraderos, Mis turnos, Cuenta |
-| Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta |
-| Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Cuenta     |
+| Rol           | Correo                   | Pestañas que ve                          |
+| ------------- | ------------------------ | ---------------------------------------- |
+| Pasajero      | `ana.pasajera@voybus.cl` | Líneas, Paraderos, Viajar, Cuenta        |
+| Conductor     | `carlos.rojas@voybus.cl` | Líneas, Paraderos, Mis turnos, Cuenta    |
+| Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta    |
+| Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Flota, Cuenta |
 
 - La sesión se guarda cifrada en el teléfono (`expo-secure-store`): al reabrir la app sigue
   iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
@@ -71,7 +71,7 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
 Frontend/
 ├── app/                        # pantallas (Expo Router: cada archivo es una ruta)
 │   ├── _layout.tsx             # navegación principal y sesión
-│   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, mis-turnos, viajar, usuario
+│   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, flota, mis-turnos, viajar, usuario
 │   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde)
 │   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
 │   ├── verificar.tsx           # ACC-01: código de verificación del contacto (y reenvío)
@@ -82,6 +82,7 @@ Frontend/
 │   ├── paradero/[id].tsx       # RED-02: paradero con sus líneas
 │   ├── turno/                  # ADM-03: detalle y formulario de turnos
 │   ├── conductor/              # VEH-03: turno del conductor y solicitudes de parada
+│   ├── vehiculo/[id].tsx       # VEH-03: historial de estados e incidencias (administrador)
 │   └── viaje/[id].tsx          # VIA-02: elegir destino y solicitar parada
 ├── src/
 │   ├── api/                    # cliente de la API y una función por consulta
@@ -95,17 +96,17 @@ Frontend/
 
 ## Requisitos cubiertos
 
-| Requisito | Pantallas                                                                                       |
-| --------- | ----------------------------------------------------------------------------------------------- |
-| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos                |
-| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene                      |
-| ACC-03    | Pestaña Cuenta: cerrar sesión                                                                   |
-| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                             |
-| RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos |
-| RED-02    | Pestaña Paraderos (con favoritos) y detalle: líneas que pasan, sentidos y favorito              |
-| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                                        |
-| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias                        |
-| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                            |
+| Requisito | Pantallas                                                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos                                                                             |
+| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene                                                                                   |
+| ACC-03    | Pestaña Cuenta: cerrar sesión                                                                                                                                |
+| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                                                                                          |
+| RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos                                                              |
+| RED-02    | Pestaña Paraderos (con favoritos) y detalle: líneas que pasan, sentidos y favorito                                                                           |
+| VIA-02    | Pestaña Viajar: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                            |
+| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
+| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente
 
