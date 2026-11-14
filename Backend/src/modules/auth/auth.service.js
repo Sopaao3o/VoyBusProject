@@ -36,6 +36,9 @@ const minutosRecuperacion = () =>
 
 const MENSAJE_RECUPERACION =
   'Si el correo pertenece a una cuenta verificada, enviamos un enlace temporal para restablecer la contraseña';
+const MENSAJE_REENVIO =
+  'Si la cuenta está pendiente de verificación, enviamos un código nuevo a ese medio de contacto';
+const REENVIO_ESPERA_SEGUNDOS_POR_DEFECTO = 60;
 const MENSAJE_PASSWORD_ACTUALIZADA = 'Tu contraseña fue actualizada';
 
 /** Datos del usuario que sí pueden salir en una respuesta (nunca el hash ni el código). */
@@ -163,6 +166,34 @@ function createAuthService(
     if (usuario.correo) claves.push(`correo:${usuario.correo}`);
     if (usuario.telefono) claves.push(`telefono:${usuario.telefono}`);
     for (const clave of claves) intentosLogin.delete(clave);
+  }
+
+  // ACC-01: espera mínima entre dos reenvíos del código al mismo contacto (memoria del proceso).
+  const reenvioEsperaMs =
+    numeroPositivo(process.env.REENVIO_ESPERA_SEGUNDOS, REENVIO_ESPERA_SEGUNDOS_POR_DEFECTO) * 1000;
+  const ultimosReenvios = new Map();
+
+  /** Lanza 429 si se pidió otro código para ese contacto hace muy poco. */
+  function exigirEsperaDeReenvio(clave) {
+    const ahoraMs = ahora().getTime();
+    for (const [otra, momento] of ultimosReenvios) {
+      if (ahoraMs - momento >= reenvioEsperaMs) ultimosReenvios.delete(otra);
+    }
+    const anterior = ultimosReenvios.get(clave);
+    if (anterior !== undefined) {
+      const segundos = Math.max(1, Math.ceil((anterior + reenvioEsperaMs - ahoraMs) / 1000));
+      const error = new HttpError(
+        429,
+        `Ya enviamos un código hace poco. Espera ${segundos} segundos para pedir otro`,
+        {
+          code: 'DEMASIADOS_INTENTOS',
+          details: [{ campo: 'espera_segundos', mensaje: String(segundos) }],
+        },
+      );
+      error.retryAfterSegundos = segundos;
+      throw error;
+    }
+    ultimosReenvios.set(clave, ahoraMs);
   }
 
   /** Guarda el hash del enlace temporal; el token en claro solo viaja al correo. */
@@ -726,9 +757,15 @@ function createAuthService(
       if (new Date(usuario.codigo_verificacion_expira).getTime() <= ahora().getTime()) {
         throw new HttpError(409, 'El código de verificación expiró', { code: 'CODIGO_EXPIRADO' });
       }
+      // El código tiene solo 6 dígitos: sin un límite de intentos se podría adivinar probando.
+      // Se aplica la misma espera que al inicio de sesión (ACC-02).
+      const claveIntentos = `verificacion:${usuario.id}`;
+      exigirSinBloqueo(claveIntentos);
       if (!(await bcrypt.compare(codigo, usuario.codigo_verificacion))) {
+        registrarIntentoFallido(claveIntentos);
         throw badRequest('El código de verificación no es correcto', { code: 'CODIGO_INVALIDO' });
       }
+      intentosLogin.delete(claveIntentos);
 
       await usuario.update({
         estado: 'habilitado',
@@ -740,6 +777,33 @@ function createAuthService(
       });
 
       return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
+    },
+
+    /**
+     * ACC-01: genera un código nuevo para una cuenta que todavía no verifica su contacto.
+     * El código anterior deja de servir. La respuesta es siempre la misma, exista o no la
+     * cuenta, y la espera entre reenvíos se aplica al contacto (no revela si tiene cuenta).
+     */
+    async reenviarCodigo({ correo, telefono }) {
+      const canal = correo ? 'correo' : 'telefono';
+      exigirEsperaDeReenvio(`${canal}:${correo || telefono}`);
+
+      const respuesta = { mensaje: MENSAJE_REENVIO };
+      const usuario = await Usuario.findOne({ where: correo ? { correo } : { telefono } });
+      const canalDeLaCuenta =
+        usuario?.canal_verificacion || (usuario?.correo ? 'correo' : 'telefono');
+      if (!usuario || usuario.estado !== 'sin_verificar' || canalDeLaCuenta !== canal) {
+        return respuesta;
+      }
+
+      const codigo = generarCodigo();
+      const expira = new Date(ahora().getTime() + minutosCodigo() * 60 * 1000).toISOString();
+      await usuario.update({
+        codigo_verificacion: await bcrypt.hash(codigo, rondasBcrypt()),
+        codigo_verificacion_expira: expira,
+        canal_verificacion: canal,
+      });
+      return { ...respuesta, codigo, expira_en: expira };
     },
 
     /** Acceso como invitado: una cuenta de pasajero temporal, sin correo ni contraseña. */

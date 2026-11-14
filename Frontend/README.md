@@ -57,11 +57,13 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
 | Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta |
 | Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Cuenta     |
 
-- La sesión se guarda en memoria: al cerrar la app hay que iniciar sesión de nuevo.
+- La sesión se guarda cifrada en el teléfono (`expo-secure-store`): al reabrir la app sigue
+  iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
 - Como el backend no tiene servicio de correo ni SMS, en desarrollo el código de verificación y
   el código del enlace de recuperación llegan en la respuesta y la app los muestra.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
-  La app abre la aplicación instalada en el teléfono o muestra la clave para agregarla a mano.
+  La app muestra el código QR, y también permite abrir la aplicación instalada en el mismo
+  teléfono o copiar la clave a mano.
 
 ## Estructura
 
@@ -71,7 +73,8 @@ Frontend/
 │   ├── _layout.tsx             # navegación principal y sesión
 │   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, mis-turnos, viajar, usuario
 │   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde)
-│   ├── registro.tsx            # ACC-01: crear cuenta de pasajero y verificar el contacto
+│   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
+│   ├── verificar.tsx           # ACC-01: código de verificación del contacto (y reenvío)
 │   ├── dos-factores.tsx        # ACC-01: activar o desactivar la verificación en dos pasos
 │   ├── recuperar.tsx           # ACC-04: recuperar la contraseña
 │   ├── cambiar-password.tsx    # ACC-04: cambiar la contraseña
@@ -107,5 +110,4 @@ Frontend/
 ## Pendiente
 
 - Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de la pestaña Viajar.
-- Guardar la sesión entre reinicios de la app.
 - Mapa con la ubicación de los vehículos.

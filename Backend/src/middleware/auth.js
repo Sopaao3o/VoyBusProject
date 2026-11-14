@@ -52,7 +52,7 @@ function crearAutenticacion({ models }) {
     // Cambiar o restablecer la contraseña incrementa esta versión: los tokens emitidos antes
     // dejan de servir, aunque su firma y su fecha de expiración sigan siendo válidas.
     const usuario = await Usuario.findByPk(usuarioId, {
-      attributes: ['id', 'token_version'],
+      attributes: ['id', 'token_version', 'estado'],
     });
     const versionActual = Number(usuario?.token_version) || 0;
     const versionDelToken = Number(payload.token_version) || 0;
@@ -65,6 +65,15 @@ function crearAutenticacion({ models }) {
             code: 'SESION_CERRADA',
           },
         ),
+      );
+    }
+
+    // Una cuenta deshabilitada pierde el acceso de inmediato, aunque su token siga vigente.
+    if (usuario.estado === 'deshabilitado') {
+      return next(
+        new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+          code: 'CUENTA_DESHABILITADA',
+        }),
       );
     }
 

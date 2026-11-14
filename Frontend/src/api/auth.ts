@@ -22,6 +22,13 @@ export const registrarPasajero = (body: RegistroPasajeroBody) =>
 export const verificarContacto = (body: VerificarContactoBody) =>
   api<SesionAutenticada>('/auth/verificar-contacto', { method: 'POST', body }).then(dato);
 
+/** Pide un código nuevo para una cuenta que todavía no verifica su contacto. */
+export const reenviarCodigo = (contacto: { correo: string } | { telefono: string }) =>
+  api<{ mensaje: string; codigo_desarrollo?: string; expira_en?: string }>(
+    '/auth/reenviar-codigo',
+    { method: 'POST', body: contacto },
+  ).then(dato);
+
 export const entrarComoInvitado = () =>
   api<SesionAutenticada>('/auth/invitado', { method: 'POST' }).then(dato);
 

@@ -108,15 +108,31 @@ const ESTADOS_VEHICULO = {
   10: 'fuera_de_servicio',
 };
 
+/**
+ * Sin usuarios de demostración (producción) no existiría ningún administrador. Si el entorno
+ * define ADMIN_CORREO y ADMIN_PASSWORD, se crea con esos datos; la contraseña conocida de la
+ * demo (PASSWORD_DEMO) nunca llega a producción.
+ */
+async function crearAdministradorInicial(Usuario, rondas) {
+  const correo = (process.env.ADMIN_CORREO || '').trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || '';
+  if (!correo || password.length < 8) return;
+  await Usuario.create({
+    rol: 'administrador',
+    nombre_visible: 'Administrador',
+    correo,
+    estado: 'habilitado',
+    password_hash: await bcrypt.hash(password, rondas),
+    correo_verificado: 1,
+    terminos_aceptados_en: new Date().toISOString(),
+  });
+}
+
 /** Carga los datos de ejemplo. Pensado para una base recién migrada. */
-async function cargarDatosEjemplo({
-  Usuario,
-  Linea,
-  Recorrido,
-  Paradero,
-  RecorridoParadero,
-  Vehiculo,
-}) {
+async function cargarDatosEjemplo(
+  { Usuario, Linea, Recorrido, Paradero, RecorridoParadero, Vehiculo },
+  { usuariosDemo = true } = {},
+) {
   const lineaId = {};
   for (const l of LINEAS) lineaId[l.codigo] = (await Linea.create(l)).id;
 
@@ -144,14 +160,19 @@ async function cargarDatosEjemplo({
     }
   }
 
-  const passwordHash = await bcrypt.hash(PASSWORD_DEMO, Number(process.env.BCRYPT_ROUNDS) || 10);
-  for (const u of USUARIOS) {
-    await Usuario.create({
-      ...u,
-      password_hash: passwordHash,
-      correo_verificado: 1,
-      terminos_aceptados_en: new Date().toISOString(),
-    });
+  const rondas = Number(process.env.BCRYPT_ROUNDS) || 10;
+  if (usuariosDemo) {
+    const passwordHash = await bcrypt.hash(PASSWORD_DEMO, rondas);
+    for (const u of USUARIOS) {
+      await Usuario.create({
+        ...u,
+        password_hash: passwordHash,
+        correo_verificado: 1,
+        terminos_aceptados_en: new Date().toISOString(),
+      });
+    }
+  } else {
+    await crearAdministradorInicial(Usuario, rondas);
   }
 
   for (let i = 1; i <= 10; i++) {

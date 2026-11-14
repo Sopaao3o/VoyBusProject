@@ -3,27 +3,16 @@ import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { entrarComoInvitado, registrarPasajero, verificarContacto } from '../src/api/auth';
+import { entrarComoInvitado, registrarPasajero } from '../src/api/auth';
 import { textoDeError } from '../src/api/client';
-import type {
-  CanalVerificacion,
-  RegistroPasajeroBody,
-  UsuarioSesion,
-  VerificacionPendiente,
-} from '../src/api/tipos';
-import { Aviso } from '../src/components/Etiquetas';
-import { Boton, Campo, Selector } from '../src/components/Formulario';
+import type { CanalVerificacion, RegistroPasajeroBody, UsuarioSesion } from '../src/api/tipos';
+import { CajaError } from '../src/components/Estados';
+import { Boton, Campo, CampoPassword, Selector } from '../src/components/Formulario';
+import { ReglasPassword } from '../src/components/ReglasPassword';
 import { useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
-interface Pendiente {
-  canal: CanalVerificacion;
-  contacto: string;
-  usuario: UsuarioSesion;
-  verificacion: VerificacionPendiente;
-}
-
-// ACC-01: registro de pasajero en dos pasos (datos → código de verificación).
+// ACC-01: registro de pasajero. Tras enviar los datos, sigue la pantalla del código (/verificar).
 // La verificación en dos pasos se activa después, desde la pestaña Cuenta.
 export default function RegistroScreen() {
   const router = useRouter();
@@ -37,8 +26,6 @@ export default function RegistroScreen() {
   const [confirmacion, setConfirmacion] = useState('');
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
 
-  const [pendiente, setPendiente] = useState<Pendiente | null>(null);
-  const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,40 +97,14 @@ export default function RegistroScreen() {
     setEnviando(true);
     try {
       const data = await registrarPasajero(cuerpo);
-      setPendiente({
-        canal,
-        contacto,
-        usuario: data.usuario,
-        verificacion: data.verificacion,
-      });
-      // En desarrollo el backend devuelve el código porque no hay correo/SMS.
-      setCodigo(data.verificacion.codigo_desarrollo ?? '');
       setPassword('');
       setConfirmacion('');
-    } catch (e) {
-      setError(textoDeError(e));
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  async function verificar() {
-    if (!pendiente) return;
-    if (!/^\d{6}$/.test(codigo.trim())) {
-      Alert.alert('Revisa el código', 'El código de verificación debe tener 6 dígitos.');
-      return;
-    }
-
-    setError(null);
-    setEnviando(true);
-    try {
-      const sesion = await verificarContacto({
-        codigo: codigo.trim(),
-        ...(pendiente.canal === 'correo'
-          ? { correo: pendiente.contacto }
-          : { telefono: pendiente.contacto }),
+      // El segundo paso (código de verificación) tiene su propia pantalla.
+      // En desarrollo el backend devuelve el código porque no hay correo/SMS.
+      router.push({
+        pathname: '/verificar',
+        params: { canal, contacto, codigo: data.verificacion.codigo_desarrollo ?? '' },
       });
-      usarSesion(sesion.usuario, sesion.token);
     } catch (e) {
       setError(textoDeError(e));
     } finally {
@@ -162,57 +123,6 @@ export default function RegistroScreen() {
     } finally {
       setEnviando(false);
     }
-  }
-
-  function volverAlFormulario() {
-    setPendiente(null);
-    setCodigo('');
-    setError(null);
-  }
-
-  if (pendiente) {
-    const porCorreo = pendiente.canal === 'correo';
-    return (
-      <ScrollView contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
-        <Stack.Screen options={{ title: 'Verificar contacto' }} />
-
-        <Text style={styles.titulo}>Revisa tu {porCorreo ? 'correo' : 'teléfono'}</Text>
-        <Text style={styles.ayuda}>
-          Enviamos un código de 6 dígitos a {pendiente.contacto}. Ingrésalo para habilitar tu
-          cuenta.
-        </Text>
-
-        {pendiente.verificacion.codigo_desarrollo && (
-          <Aviso
-            texto={`Modo desarrollo: el código es ${pendiente.verificacion.codigo_desarrollo}.`}
-          />
-        )}
-
-        <Campo
-          etiqueta="Código de verificación"
-          value={codigo}
-          onChangeText={setCodigo}
-          placeholder="123456"
-          keyboardType="number-pad"
-          maxLength={6}
-          ayuda="Son 6 dígitos."
-        />
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <Boton
-          titulo={enviando ? 'Verificando…' : 'Verificar y crear cuenta'}
-          onPress={verificar}
-          deshabilitado={enviando}
-        />
-        <Boton
-          titulo="Volver al formulario"
-          variante="secundario"
-          onPress={volverAlFormulario}
-          deshabilitado={enviando}
-        />
-      </ScrollView>
-    );
   }
 
   return (
@@ -264,22 +174,20 @@ export default function RegistroScreen() {
         />
       )}
 
-      <Campo
+      <CampoPassword
         etiqueta="Contraseña"
         value={password}
         onChangeText={setPassword}
-        placeholder="Clave123!"
-        secureTextEntry
         textContentType="newPassword"
-        ayuda="De 8 a 15 caracteres, con mayúscula, minúscula, número y símbolo."
+        maxLength={15}
       />
-      <Campo
+      <ReglasPassword tipo="registro" password={password} />
+      <CampoPassword
         etiqueta="Repetir contraseña"
         value={confirmacion}
         onChangeText={setConfirmacion}
-        placeholder="Clave123!"
-        secureTextEntry
         textContentType="newPassword"
+        maxLength={15}
       />
 
       <Pressable
@@ -298,7 +206,7 @@ export default function RegistroScreen() {
         </Text>
       </Pressable>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      <CajaError mensaje={error} />
 
       <Boton
         titulo={enviando ? 'Creando cuenta…' : 'Crear cuenta'}
@@ -326,15 +234,6 @@ const styles = StyleSheet.create({
   contenido: { padding: 16, gap: 14, paddingBottom: 40 },
   titulo: { fontSize: 20, fontWeight: '700', color: colors.text },
   ayuda: { fontSize: 14, color: colors.textMuted },
-  error: {
-    backgroundColor: colors.surface,
-    borderColor: colors.accent,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    color: colors.accent,
-    fontWeight: '600',
-  },
   terminos: {
     flexDirection: 'row',
     alignItems: 'center',

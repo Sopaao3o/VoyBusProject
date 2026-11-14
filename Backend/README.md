@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (115)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (121)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -100,15 +100,25 @@ Las cuentas de ejemplo usan la contraseña `Clave123!` y correos `@voybus.cl`; s
 - `4` Luis Pérez · conductor deshabilitado · `luis.perez@voybus.cl`
 - `5` Ana Pasajera · pasajero · `ana.pasajera@voybus.cl`
 
+Seguridad de las cuentas:
+
+- En producción (`NODE_ENV=production`) **no** se cargan las cuentas de ejemplo. El primer
+  administrador se crea con `ADMIN_CORREO` y `ADMIN_PASSWORD` (ver `.env.example`).
+- Una cuenta deshabilitada pierde el acceso de inmediato (`403 CUENTA_DESHABILITADA`), aunque su
+  token siga vigente.
+- Tras 5 códigos de verificación incorrectos hay que esperar, igual que en el inicio de sesión
+  (`429 DEMASIADOS_INTENTOS`).
+
 ## Endpoints
 
 ### Registro de pasajero (ACC-01) · público
 
-| Método y ruta                          | Descripción                                                            |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `POST /api/v1/auth/registro`           | Crea una cuenta de pasajero y envía un código al contacto (ver abajo). |
-| `POST /api/v1/auth/verificar-contacto` | Confirma el código, habilita la cuenta y devuelve un JWT.              |
-| `POST /api/v1/auth/invitado`           | Crea una cuenta temporal de pasajero invitado y devuelve un JWT.       |
+| Método y ruta                          | Descripción                                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/v1/auth/registro`           | Crea una cuenta de pasajero y envía un código al contacto (ver abajo).                                                                                 |
+| `POST /api/v1/auth/verificar-contacto` | Confirma el código, habilita la cuenta y devuelve un JWT.                                                                                              |
+| `POST /api/v1/auth/reenviar-codigo`    | Envía un código nuevo a una cuenta sin verificar (`{ "correo" }` o `{ "telefono" }`). El anterior deja de servir; hay que esperar 60 s entre reenvíos. |
+| `POST /api/v1/auth/invitado`           | Crea una cuenta temporal de pasajero invitado y devuelve un JWT.                                                                                       |
 
 Cuerpo de `POST /api/v1/auth/registro`:
 

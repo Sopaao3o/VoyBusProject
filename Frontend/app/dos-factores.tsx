@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import { confirmar2fa, desactivar2fa, iniciarConfiguracion2fa } from '../src/api/auth';
 import { textoDeError } from '../src/api/client';
 import type { Configuracion2fa } from '../src/api/tipos';
 import { CajaError, ErrorMensaje } from '../src/components/Estados';
-import { Boton, Campo } from '../src/components/Formulario';
+import { Boton, Campo, CampoPassword } from '../src/components/Formulario';
 import { useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
@@ -93,11 +94,10 @@ export default function DosFactoresScreen() {
         <Text style={styles.ayuda}>
           Para desactivarla, confirma tu contraseña y un código de tu aplicación autenticadora.
         </Text>
-        <Campo
+        <CampoPassword
           etiqueta="Contraseña actual"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
           textContentType="password"
         />
         <Campo
@@ -142,11 +142,22 @@ export default function DosFactoresScreen() {
   // ── Paso 2: agregar la clave a la aplicación y confirmar un código ──
   return (
     <ScrollView contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
-      <Text style={styles.titulo}>1. Agrega VoyBus a tu aplicación</Text>
-      <Boton titulo="Abrir mi aplicación autenticadora" onPress={abrirAplicacion} />
+      <Text style={styles.titulo}>1. Escanea el código QR</Text>
       <Text style={styles.ayuda}>
-        Si no se abre, agrega una cuenta a mano en la aplicación con esta clave:
+        Abre tu aplicación autenticadora en otro dispositivo y escanea este código.
       </Text>
+      <View style={styles.qr} accessibilityLabel="Código QR para la aplicación autenticadora">
+        <QRCode value={configuracion.otpauth_url} size={200} />
+      </View>
+
+      <Text style={styles.ayuda}>
+        ¿La aplicación está en este mismo teléfono? Ábrela directamente o agrega la clave a mano:
+      </Text>
+      <Boton
+        titulo="Abrir mi aplicación autenticadora"
+        variante="secundario"
+        onPress={abrirAplicacion}
+      />
       <View style={styles.clave}>
         <Text style={styles.claveTexto} selectable>
           {enGrupos(configuracion.secreto)}
@@ -177,6 +188,14 @@ const styles = StyleSheet.create({
   contenido: { padding: 16, gap: 14, paddingBottom: 40 },
   titulo: { fontSize: 18, fontWeight: '700', color: colors.text },
   ayuda: { fontSize: 14, color: colors.textMuted },
+  qr: {
+    alignSelf: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    borderColor: colors.border,
+    borderWidth: 1,
+  },
   clave: {
     backgroundColor: colors.surface,
     borderColor: colors.border,

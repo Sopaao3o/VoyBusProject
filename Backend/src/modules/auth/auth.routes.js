@@ -4,6 +4,7 @@ const {
   registroBody,
   sesionBody,
   verificacionBody,
+  reenvioBody,
   cierreSesionBody,
   recuperacionBody,
   restablecerPasswordBody,
@@ -59,6 +60,7 @@ function createAuthRoutes(controller, { autenticar } = {}) {
     validar({ body: verificacionBody }),
     controller.verificarContacto,
   );
+  router.post('/reenviar-codigo', validar({ body: reenvioBody }), controller.reenviarCodigo);
   router.post('/invitado', controller.registrarInvitado);
 
   return router;

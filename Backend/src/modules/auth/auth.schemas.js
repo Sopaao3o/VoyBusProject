@@ -97,6 +97,9 @@ const verificacionBody = z
   })
   .superRefine(unSoloContacto);
 
+// ACC-01: pedir un código nuevo cuando el anterior venció o no llegó.
+const reenvioBody = z.object({ correo, telefono }).superRefine(unSoloContacto);
+
 // ACC-02: para iniciar sesión no se exige la complejidad de una contraseña nueva,
 // solo que venga escrita. Así una cuenta antigua también puede ingresar.
 const passwordIngreso = z
@@ -186,6 +189,7 @@ const cambioPasswordBody = z
 module.exports = {
   registroBody,
   verificacionBody,
+  reenvioBody,
   sesionBody,
   cierreSesionBody,
   recuperacionBody,

@@ -5,7 +5,8 @@ import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
 import { cambiarPassword } from '../src/api/auth';
 import { textoDeError } from '../src/api/client';
 import { CajaError } from '../src/components/Estados';
-import { Boton, Campo } from '../src/components/Formulario';
+import { Boton, CampoPassword } from '../src/components/Formulario';
+import { ReglasPassword } from '../src/components/ReglasPassword';
 import { useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
@@ -52,26 +53,23 @@ export default function CambiarPasswordScreen() {
       <Text style={styles.ayuda}>
         Por seguridad, al cambiar la contraseña se cierran tus sesiones en otros dispositivos.
       </Text>
-      <Campo
+      <CampoPassword
         etiqueta="Contraseña actual"
         value={actual}
         onChangeText={setActual}
-        secureTextEntry
         textContentType="password"
       />
-      <Campo
+      <CampoPassword
         etiqueta="Nueva contraseña"
         value={nueva}
         onChangeText={setNueva}
-        secureTextEntry
         textContentType="newPassword"
-        ayuda="Al menos 8 caracteres, con letras y números."
       />
-      <Campo
-        etiqueta="Repetir nueva contraseña"
+      <ReglasPassword tipo="nueva" password={nueva} actual={actual} />
+      <CampoPassword
+        etiqueta="Confirmar nueva contraseña"
         value={confirmacion}
         onChangeText={setConfirmacion}
-        secureTextEntry
         textContentType="newPassword"
       />
       <CajaError mensaje={error} />

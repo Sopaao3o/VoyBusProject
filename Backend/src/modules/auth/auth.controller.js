@@ -55,7 +55,28 @@ function createAuthController(
     },
 
     verificarContacto: async (req, res) => {
-      res.json({ data: await service.verificarContacto(req.datos.body) });
+      try {
+        res.json({ data: await service.verificarContacto(req.datos.body) });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
+    },
+
+    reenviarCodigo: async (req, res) => {
+      try {
+        const { mensaje, codigo, expira_en } = await service.reenviarCodigo(req.datos.body);
+        const data = { mensaje };
+        // Igual que en el registro: sin correo/SMS, en desarrollo se devuelve el código.
+        if (exponerCodigoVerificacion && codigo) {
+          data.codigo_desarrollo = codigo;
+          data.expira_en = expira_en;
+        }
+        res.json({ data });
+      } catch (error) {
+        if (error.retryAfterSegundos) res.set('Retry-After', String(error.retryAfterSegundos));
+        throw error;
+      }
     },
 
     iniciarDosFactores: async (req, res) => {

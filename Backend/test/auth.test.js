@@ -276,3 +276,50 @@ test('ACC-01: el acceso como invitado crea un pasajero temporal sin contraseña'
   assert.equal(guardado.password_hash, null);
   assert.match(guardado.identificador, /^INV-/);
 });
+
+test('ACC-01: reenvía un código nuevo, invalida el anterior y pide esperar entre reenvíos', async () => {
+  const correo = correoUnico();
+  const alta = await registrar({ correo });
+  const codigoViejo = alta.body.data.verificacion.codigo_desarrollo;
+
+  const reenvio = await post('/auth/reenviar-codigo', { correo });
+  assert.equal(reenvio.status, 200);
+  const codigoNuevo = reenvio.body.data.codigo_desarrollo;
+  assert.match(codigoNuevo, /^\d{6}$/);
+  assert.ok(reenvio.body.data.expira_en);
+
+  if (codigoViejo !== codigoNuevo) {
+    const conViejo = await post('/auth/verificar-contacto', { correo, codigo: codigoViejo });
+    assert.equal(conViejo.status, 400);
+    assert.equal(conViejo.body.error.code, 'CODIGO_INVALIDO');
+  }
+
+  // Un segundo reenvío inmediato debe esperar.
+  const repetido = await post('/auth/reenviar-codigo', { correo });
+  assert.equal(repetido.status, 429);
+  assert.equal(repetido.body.error.code, 'DEMASIADOS_INTENTOS');
+
+  const conNuevo = await post('/auth/verificar-contacto', { correo, codigo: codigoNuevo });
+  assert.equal(conNuevo.status, 200);
+  assert.ok(conNuevo.body.data.token);
+});
+
+test('ACC-01: el reenvío no revela si el contacto tiene cuenta ni reenvía a cuentas verificadas', async () => {
+  const desconocido = await post('/auth/reenviar-codigo', { correo: 'nadie@example.com' });
+  assert.equal(desconocido.status, 200);
+  assert.equal(desconocido.body.data.codigo_desarrollo, undefined);
+
+  const correo = correoUnico();
+  const alta = await registrar({ correo });
+  await post('/auth/verificar-contacto', {
+    correo,
+    codigo: alta.body.data.verificacion.codigo_desarrollo,
+  });
+  const verificada = await post('/auth/reenviar-codigo', { correo });
+  assert.equal(verificada.status, 200);
+  assert.equal(verificada.body.data.mensaje, desconocido.body.data.mensaje);
+  assert.equal(verificada.body.data.codigo_desarrollo, undefined);
+
+  const sinContacto = await post('/auth/reenviar-codigo', {});
+  assert.equal(sinContacto.status, 400);
+});

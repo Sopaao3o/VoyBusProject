@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { entrarComoInvitado, iniciarSesion, verificarSegundoFactor } from '../src/api/auth';
-import { textoDeError } from '../src/api/client';
+import { ApiError, textoDeError } from '../src/api/client';
 import type { CanalVerificacion } from '../src/api/tipos';
 import { CajaError } from '../src/components/Estados';
-import { Boton, Campo, Selector } from '../src/components/Formulario';
+import { Boton, Campo, CampoPassword, Selector } from '../src/components/Formulario';
 import { useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
@@ -23,15 +23,19 @@ export default function LoginScreen() {
   const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // La cuenta existe pero falta confirmar el código del registro: se ofrece ir a verificarla.
+  const [sinVerificar, setSinVerificar] = useState(false);
 
   /** Ejecuta un paso del inicio de sesión y, si entrega una sesión, entra a la app. */
   async function intentar(paso: () => Promise<void>) {
     setError(null);
+    setSinVerificar(false);
     setEnviando(true);
     try {
       await paso();
     } catch (e) {
       setError(textoDeError(e));
+      setSinVerificar(e instanceof ApiError && e.code === 'CUENTA_SIN_VERIFICAR');
     } finally {
       setEnviando(false);
     }
@@ -145,15 +149,22 @@ export default function LoginScreen() {
           textContentType="telephoneNumber"
         />
       )}
-      <Campo
+      <CampoPassword
         etiqueta="Contraseña"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
         textContentType="password"
       />
 
       <CajaError mensaje={error} />
+      {sinVerificar && (
+        <Boton
+          titulo="Verificar mi cuenta"
+          onPress={() =>
+            router.push({ pathname: '/verificar', params: { canal, contacto: contacto.trim() } })
+          }
+        />
+      )}
       <Boton
         titulo={enviando ? 'Ingresando…' : 'Iniciar sesión'}
         onPress={enviarCredenciales}

@@ -49,6 +49,8 @@ export default function CuentaScreen() {
           setCerrando(true);
           await cerrarSesion();
           setCerrando(false);
+          // ACC-03: tras salir, la app vuelve a la pantalla de acceso.
+          router.push('/login');
         },
       },
     ]);

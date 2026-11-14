@@ -6,7 +6,8 @@ import { recuperarPassword, restablecerPassword } from '../src/api/auth';
 import { textoDeError } from '../src/api/client';
 import { CajaError } from '../src/components/Estados';
 import { Aviso } from '../src/components/Etiquetas';
-import { Boton, Campo } from '../src/components/Formulario';
+import { Boton, Campo, CampoPassword } from '../src/components/Formulario';
+import { ReglasPassword } from '../src/components/ReglasPassword';
 import { colors } from '../src/theme/colors';
 
 // ACC-04: recuperar la contraseña en dos pasos (pedir el enlace temporal → definir la nueva).
@@ -101,19 +102,17 @@ export default function RecuperarScreen() {
         onChangeText={setToken}
         ayuda="Viene en el enlace que enviamos a tu correo."
       />
-      <Campo
+      <CampoPassword
         etiqueta="Nueva contraseña"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
         textContentType="newPassword"
-        ayuda="Al menos 8 caracteres, con letras y números."
       />
-      <Campo
-        etiqueta="Repetir nueva contraseña"
+      <ReglasPassword tipo="nueva" password={password} />
+      <CampoPassword
+        etiqueta="Confirmar nueva contraseña"
         value={confirmacion}
         onChangeText={setConfirmacion}
-        secureTextEntry
         textContentType="newPassword"
       />
       <CajaError mensaje={error} />
