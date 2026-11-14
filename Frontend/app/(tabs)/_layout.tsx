@@ -6,9 +6,9 @@ import { colors } from '../../src/theme/colors';
 
 export default function TabsLayout() {
   const { usuario } = useUsuario();
-  const esAdmin = usuario.rol === 'administrador';
-  const esConductor = usuario.rol === 'conductor';
-  const esPasajero = usuario.rol === 'pasajero';
+  const esAdmin = usuario?.rol === 'administrador';
+  const esConductor = usuario?.rol === 'conductor';
+  const esPasajero = usuario?.rol === 'pasajero';
 
   return (
     <Tabs
@@ -73,7 +73,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="usuario"
         options={{
-          title: 'Usuario',
+          title: 'Cuenta',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" color={color as string} size={size} />
           ),

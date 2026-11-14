@@ -14,7 +14,7 @@ import { fechaHora, rangoHoras } from '../../src/utils/fechas';
 export default function MisTurnosScreen() {
   const router = useRouter();
   const { usuario } = useUsuario();
-  const { datos, cargando, error, recargar } = useApi(misTurnos, [usuario.id]);
+  const { datos, cargando, error, recargar } = useApi(misTurnos, [usuario?.id ?? null]);
 
   useFocusEffect(
     useCallback(() => {
@@ -22,7 +22,7 @@ export default function MisTurnosScreen() {
     }, [recargar]),
   );
 
-  if (usuario.rol !== 'conductor') {
+  if (usuario?.rol !== 'conductor') {
     return <ErrorMensaje mensaje="Esta sección es solo para conductores." />;
   }
   if (cargando && !datos) return <Cargando />;

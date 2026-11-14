@@ -43,31 +43,38 @@ Funciona sin servicios de pago: se prueba con **Expo Go** y el backend local.
 | `npm run format`       | Da formato a todos los archivos con Prettier |
 | `npm run format:check` | Comprueba el formato sin modificar nada      |
 
-## Usuario de prueba
+## Sesión y cuentas
 
-Todavía no hay inicio de sesión. La pestaña **Usuario** permite elegir un usuario de ejemplo
-(pasajero, conductor o administrador) o **crear una cuenta de pasajero** (ACC-01). Tras verificar
-el código, la cuenta queda activa y la app envía su id en el encabezado `x-user-id`, igual que el
-placeholder del backend. El JWT que devuelve ACC-01 se guarda en `src/api/client.ts` para cuando
-el backend reemplace ese encabezado. También se puede entrar como invitado.
+Las líneas y los paraderos se consultan sin cuenta. Lo demás exige iniciar sesión en la pestaña
+**Cuenta**; la app envía el JWT en el encabezado `Authorization: Bearer <token>`.
 
-Cuando existan las sesiones, solo hay que cambiar `src/api/client.ts` y
-`src/session/UsuarioContext.tsx`.
+Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña `Clave123!`:
 
-| Rol           | Pestañas que ve                        |
-| ------------- | -------------------------------------- |
-| Pasajero      | Líneas, Paraderos, Viajar, Usuario     |
-| Conductor     | Líneas, Paraderos, Mis turnos, Usuario |
-| Administrador | Líneas, Paraderos, Turnos, Usuario     |
+| Rol           | Correo                   | Pestañas que ve                       |
+| ------------- | ------------------------ | ------------------------------------- |
+| Pasajero      | `ana.pasajera@voybus.cl` | Líneas, Paraderos, Viajar, Cuenta     |
+| Conductor     | `carlos.rojas@voybus.cl` | Líneas, Paraderos, Mis turnos, Cuenta |
+| Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta |
+| Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Cuenta     |
+
+- La sesión se guarda en memoria: al cerrar la app hay que iniciar sesión de nuevo.
+- Como el backend no tiene servicio de correo ni SMS, en desarrollo el código de verificación y
+  el código del enlace de recuperación llegan en la respuesta y la app los muestra.
+- La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
+  La app abre la aplicación instalada en el teléfono o muestra la clave para agregarla a mano.
 
 ## Estructura
 
 ```
 Frontend/
 ├── app/                        # pantallas (Expo Router: cada archivo es una ruta)
-│   ├── _layout.tsx             # navegación principal y usuario de prueba
+│   ├── _layout.tsx             # navegación principal y sesión
 │   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, mis-turnos, viajar, usuario
+│   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde)
 │   ├── registro.tsx            # ACC-01: crear cuenta de pasajero y verificar el contacto
+│   ├── dos-factores.tsx        # ACC-01: activar o desactivar la verificación en dos pasos
+│   ├── recuperar.tsx           # ACC-04: recuperar la contraseña
+│   ├── cambiar-password.tsx    # ACC-04: cambiar la contraseña
 │   ├── linea/[id].tsx          # RED-01: línea con recorridos
 │   ├── paradero/[id].tsx       # RED-02: paradero con sus líneas
 │   ├── turno/                  # ADM-03: detalle y formulario de turnos
@@ -77,7 +84,7 @@ Frontend/
 │   ├── api/                    # cliente de la API y una función por consulta
 │   ├── components/             # piezas reutilizables (formularios, estados, etiquetas)
 │   ├── hooks/                  # useApi, useBusqueda, useRecorridos
-│   ├── session/                # usuario de prueba
+│   ├── session/                # sesión
 │   ├── theme/colors.ts         # paleta de VoyBus
 │   └── utils/                  # fechas y textos
 └── .env.example
@@ -85,17 +92,20 @@ Frontend/
 
 ## Requisitos cubiertos
 
-| Requisito | Pantallas                                                                          |
-| --------- | ---------------------------------------------------------------------------------- |
-| ACC-01    | Pestaña Usuario: crear cuenta de pasajero, verificar código y entrar como invitado |
-| RED-01    | Pestaña Líneas y detalle de la línea (recorridos, días, horarios, paraderos)       |
-| RED-02    | Pestaña Paraderos y detalle del paradero (líneas que pasan)                        |
-| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                           |
-| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias           |
-| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia               |
+| Requisito | Pantallas                                                                        |
+| --------- | -------------------------------------------------------------------------------- |
+| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos |
+| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene       |
+| ACC-03    | Pestaña Cuenta: cerrar sesión                                                    |
+| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                              |
+| RED-01    | Pestaña Líneas y detalle de la línea (recorridos, días, horarios, paraderos)     |
+| RED-02    | Pestaña Paraderos y detalle del paradero (líneas que pasan)                      |
+| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                         |
+| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias         |
+| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia             |
 
 ## Pendiente
 
-- Inicio de sesión real (Daslav) y vinculación al viaje por QR (VIA-01), que reemplaza la lista
-  provisoria de la pestaña Viajar.
+- Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de la pestaña Viajar.
+- Guardar la sesión entre reinicios de la app.
 - Mapa con la ubicación de los vehículos.

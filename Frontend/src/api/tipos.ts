@@ -207,6 +207,7 @@ export interface UsuarioSesion {
   tipo_acceso: string;
   correo_verificado: boolean;
   telefono_verificado: boolean;
+  dos_factores_activo: boolean;
   fecha_registro: string;
 }
 
@@ -240,6 +241,57 @@ export interface VerificarContactoBody {
 
 export interface SesionAutenticada {
   usuario: UsuarioSesion;
+  token: string;
+  token_type: 'Bearer';
+  expira_en: string;
+}
+
+// ───── ACC-02 a ACC-04: sesión, 2FA y contraseña ─────
+
+export interface InicioSesionBody {
+  correo?: string;
+  telefono?: string;
+  password: string;
+}
+
+/** La contraseña fue correcta, pero la cuenta pide el código de la app autenticadora. */
+export interface Desafio2fa {
+  requiere_2fa: true;
+  usuario: UsuarioSesion;
+  desafio: string;
+  expira_en: string;
+}
+
+export type RespuestaInicioSesion = SesionAutenticada | Desafio2fa;
+
+export interface Configuracion2fa {
+  secreto: string;
+  cuenta: string;
+  emisor: string;
+  otpauth_url: string;
+  instrucciones: string;
+}
+
+export interface Respuesta2fa {
+  mensaje: string;
+  usuario: UsuarioSesion;
+}
+
+export interface RespuestaRecuperacion {
+  mensaje: string;
+  /** Solo en desarrollo: el backend no tiene servicio de correo todavía. */
+  token_desarrollo?: string;
+  expira_en?: string;
+}
+
+export interface CambioPasswordBody {
+  password_actual: string;
+  password: string;
+  confirmacion: string;
+}
+
+export interface RespuestaCambioPassword {
+  mensaje: string;
   token: string;
   token_type: 'Bearer';
   expira_en: string;

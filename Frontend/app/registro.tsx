@@ -24,10 +24,10 @@ interface Pendiente {
 }
 
 // ACC-01: registro de pasajero en dos pasos (datos → código de verificación).
-// El backend tampoco incluye Google/Apple ni verificación en dos pasos.
+// La verificación en dos pasos se activa después, desde la pestaña Cuenta.
 export default function RegistroScreen() {
   const router = useRouter();
-  const { agregarUsuario } = useUsuario();
+  const { iniciarSesion } = useUsuario();
 
   const [canal, setCanal] = useState<CanalVerificacion>('correo');
   const [nombre, setNombre] = useState('');
@@ -86,8 +86,8 @@ export default function RegistroScreen() {
   }
 
   function usarSesion(usuario: UsuarioSesion, token: string) {
-    agregarUsuario({ id: usuario.id, nombre: usuario.nombre, rol: usuario.rol }, token);
-    router.replace('/usuario');
+    iniciarSesion({ usuario, token });
+    router.dismissTo('/usuario');
   }
 
   async function registrarse() {

@@ -16,7 +16,11 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ title: 'Iniciar sesión' }} />
         <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
+        <Stack.Screen name="recuperar" options={{ title: 'Recuperar contraseña' }} />
+        <Stack.Screen name="cambiar-password" options={{ title: 'Cambiar contraseña' }} />
+        <Stack.Screen name="dos-factores" options={{ title: 'Verificación en dos pasos' }} />
         <Stack.Screen name="linea/[id]" options={{ title: 'Línea' }} />
         <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero' }} />
         <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />

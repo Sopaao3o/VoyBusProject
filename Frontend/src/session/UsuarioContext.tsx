@@ -1,55 +1,72 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
-import { fijarToken, fijarUsuario } from '../api/client';
-import type { Rol } from '../api/tipos';
-
-export interface UsuarioPrueba {
-  id: number;
-  nombre: string;
-  rol: Rol;
-}
-
-// Usuarios de ejemplo del backend (npm run db:reset). Reemplazar por el login real de Daslav.
-export const USUARIOS_PRUEBA: UsuarioPrueba[] = [
-  { id: 5, nombre: 'Ana Pasajera', rol: 'pasajero' },
-  { id: 2, nombre: 'Carlos Rojas', rol: 'conductor' },
-  { id: 3, nombre: 'María Soto', rol: 'conductor' },
-  { id: 1, nombre: 'Administrador', rol: 'administrador' },
-];
+import { cerrarSesion as cerrarSesionEnServidor } from '../api/auth';
+import { avisarSesionPerdida, fijarToken } from '../api/client';
+import type { UsuarioSesion } from '../api/tipos';
 
 interface Contexto {
-  usuario: UsuarioPrueba;
-  /** Usuarios de ejemplo más las cuentas creadas en esta sesión (ACC-01). */
-  usuarios: UsuarioPrueba[];
-  cambiarUsuario: (u: UsuarioPrueba) => void;
-  /** Agrega (o actualiza) una cuenta registrada y la deja activa. */
-  agregarUsuario: (u: UsuarioPrueba, token?: string | null) => void;
+  /** Cuenta con sesión iniciada, o null si se está navegando sin sesión. */
+  usuario: UsuarioSesion | null;
+  /** Guarda la sesión que devuelve el servidor (login, verificación de contacto o invitado). */
+  iniciarSesion: (sesion: { usuario: UsuarioSesion; token: string }) => void;
+  /** Reemplaza el token sin cambiar de cuenta (al cambiar la contraseña). */
+  renovarToken: (token: string) => void;
+  /** Actualiza los datos de la cuenta (por ejemplo, al activar la verificación en dos pasos). */
+  actualizarUsuario: (usuario: UsuarioSesion) => void;
+  /** ACC-03: cierra la sesión en el servidor y en la app. */
+  cerrarSesion: () => Promise<void>;
 }
 
 const UsuarioContext = createContext<Contexto | null>(null);
 
+// La sesión vive en memoria: al cerrar la app hay que iniciar sesión de nuevo.
 export function UsuarioProvider({ children }: { children: ReactNode }) {
-  const [usuarios, setUsuarios] = useState<UsuarioPrueba[]>(USUARIOS_PRUEBA);
-  const [usuario, setUsuario] = useState<UsuarioPrueba>(USUARIOS_PRUEBA[0]);
-  fijarUsuario(usuario.id);
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
 
-  const cambiarUsuario = useCallback((u: UsuarioPrueba) => {
-    // Los usuarios de ejemplo no tienen JWT: se limpia el de una cuenta registrada.
+  const iniciarSesion = useCallback((sesion: { usuario: UsuarioSesion; token: string }) => {
+    fijarToken(sesion.token);
+    setUsuario(sesion.usuario);
+  }, []);
+
+  const renovarToken = useCallback((token: string) => fijarToken(token), []);
+
+  const olvidarSesion = useCallback(() => {
     fijarToken(null);
-    fijarUsuario(u.id);
-    setUsuario(u);
+    setUsuario(null);
   }, []);
 
-  const agregarUsuario = useCallback((u: UsuarioPrueba, nuevoToken: string | null = null) => {
-    setUsuarios((lista) => [...lista.filter((x) => x.id !== u.id), u]);
-    fijarToken(nuevoToken);
-    fijarUsuario(u.id);
-    setUsuario(u);
-  }, []);
+  const cerrarSesion = useCallback(async () => {
+    try {
+      await cerrarSesionEnServidor();
+    } catch {
+      // Sin conexión o con el token ya vencido, igual se cierra la sesión en la app.
+    }
+    olvidarSesion();
+  }, [olvidarSesion]);
+
+  // Si el servidor rechaza el token (expiró o se cerró en otro lado), la app vuelve a "sin sesión".
+  useEffect(() => {
+    avisarSesionPerdida(olvidarSesion);
+    return () => avisarSesionPerdida(null);
+  }, [olvidarSesion]);
 
   const valor = useMemo(
-    () => ({ usuario, usuarios, cambiarUsuario, agregarUsuario }),
-    [usuario, usuarios, cambiarUsuario, agregarUsuario],
+    () => ({
+      usuario,
+      iniciarSesion,
+      renovarToken,
+      actualizarUsuario: setUsuario,
+      cerrarSesion,
+    }),
+    [usuario, iniciarSesion, renovarToken, cerrarSesion],
   );
   return <UsuarioContext.Provider value={valor}>{children}</UsuarioContext.Provider>;
 }

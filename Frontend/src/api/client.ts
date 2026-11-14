@@ -28,18 +28,18 @@ export function textoDeError(e: unknown) {
   return e instanceof ApiError ? e.textoCompleto : 'Ocurrió un error inesperado.';
 }
 
-// Usuario de prueba (hasta que Daslav tenga el login). Lo cambia UsuarioProvider.
-let usuarioId: number | null = null;
-export function fijarUsuario(id: number | null) {
-  usuarioId = id;
-}
-
-// JWT emitido por ACC-01 al verificar el contacto o entrar como invitado.
-// Queda listo para cuando el backend reemplace el encabezado x-user-id por el token.
+// JWT de la sesión (ACC-02). Lo fija SesionProvider al iniciar o cerrar sesión.
 let token: string | null = null;
 export function fijarToken(nuevo: string | null) {
   token = nuevo;
 }
+
+// Aviso para la app cuando el servidor rechaza la sesión (expiró o fue cerrada).
+let alPerderSesion: (() => void) | null = null;
+export function avisarSesionPerdida(aviso: (() => void) | null) {
+  alPerderSesion = aviso;
+}
+const CODIGOS_SESION_PERDIDA = ['TOKEN_INVALIDO', 'SESION_CERRADA'];
 
 interface Respuesta<T> {
   data: T;
@@ -52,7 +52,6 @@ export async function api<T>(
 ): Promise<Respuesta<T>> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (opciones.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (usuarioId !== null) headers['x-user-id'] = String(usuarioId);
   if (token !== null) headers.Authorization = `Bearer ${token}`;
 
   let res: Response;
@@ -72,6 +71,7 @@ export async function api<T>(
 
   const json = await res.json().catch(() => null);
   if (!res.ok) {
+    if (token !== null && CODIGOS_SESION_PERDIDA.includes(json?.error?.code)) alPerderSesion?.();
     throw new ApiError(
       res.status,
       json?.error?.code ?? 'ERROR',
