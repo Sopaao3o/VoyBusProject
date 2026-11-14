@@ -13,6 +13,7 @@ const definirConfiguracion = require('./configuracion');
 const definirSolicitudParada = require('./solicitud-parada');
 const definirUbicacionVehiculo = require('./ubicacion-vehiculo');
 const definirTokenRevocado = require('./token-revocado');
+const definirFavorito = require('./favorito');
 
 /** @param {import('sequelize').Sequelize} sequelize */
 function initModels(sequelize) {
@@ -30,6 +31,7 @@ function initModels(sequelize) {
   const SolicitudParada = definirSolicitudParada(sequelize);
   const UbicacionVehiculo = definirUbicacionVehiculo(sequelize);
   const TokenRevocado = definirTokenRevocado(sequelize);
+  const Favorito = definirFavorito(sequelize);
 
   // Una línea tiene recorridos (ida y vuelta)
   Linea.hasMany(Recorrido, { foreignKey: 'linea_id', as: 'recorridos' });
@@ -62,6 +64,10 @@ function initModels(sequelize) {
   // ACC-03: cada token cerrado queda registrado hasta que expira
   TokenRevocado.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
 
+  // RED-02: paraderos (o líneas) que un pasajero guarda como favoritos
+  Favorito.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
+  Favorito.belongsTo(Paradero, { foreignKey: 'paradero_id', as: 'paradero' });
+
   return {
     sequelize,
     Usuario,
@@ -78,6 +84,7 @@ function initModels(sequelize) {
     SolicitudParada,
     UbicacionVehiculo,
     TokenRevocado,
+    Favorito,
   };
 }
 

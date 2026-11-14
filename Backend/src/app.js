@@ -11,6 +11,9 @@ const { createAuthRoutes } = require('./modules/auth/auth.routes');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
+const { createFavoritosService } = require('./modules/favoritos/favoritos.service');
+const { createFavoritosController } = require('./modules/favoritos/favoritos.controller');
+const { createFavoritosRoutes } = require('./modules/favoritos/favoritos.routes');
 const { createTurnosService } = require('./modules/turnos/turnos.service');
 const { createTurnosController } = require('./modules/turnos/turnos.controller');
 const { createTurnosRoutes } = require('./modules/turnos/turnos.routes');
@@ -58,6 +61,11 @@ function createApp({
   const autenticar = crearAutenticacion({ models });
   v1.use('/auth', createAuthRoutes(auth, { autenticar }));
   v1.use(createRedRoutes(createRedController(createRedService(models))));
+  v1.use(
+    '/favoritos',
+    autenticar,
+    createFavoritosRoutes(createFavoritosController(createFavoritosService(models))),
+  );
   v1.use(
     '/admin',
     autenticar,

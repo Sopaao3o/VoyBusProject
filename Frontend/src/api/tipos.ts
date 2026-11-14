@@ -9,6 +9,9 @@ export interface Linea {
   color: string;
   estado_servicio: EstadoServicio;
   aviso?: string;
+  /** Primer y último paradero del recorrido de ida (no vienen dentro del detalle de un paradero). */
+  punto_inicio?: string | null;
+  punto_termino?: string | null;
 }
 
 export interface Paradero {
@@ -35,8 +38,16 @@ export interface LineaDetalle extends Linea {
   recorridos: Recorrido[];
 }
 
+export type Sentido = 'ida' | 'vuelta';
+
+/** Una línea que pasa por un paradero, con los sentidos (recorridos) en que lo hace. */
+export interface LineaDeParadero extends Linea {
+  sentidos: Sentido[];
+  recorridos: { id: number; sentido: Sentido }[];
+}
+
 export interface ParaderoDetalle extends Paradero {
-  lineas: Linea[];
+  lineas: LineaDeParadero[];
 }
 
 export type Rol = 'administrador' | 'conductor' | 'pasajero';

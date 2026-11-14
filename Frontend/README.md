@@ -86,7 +86,7 @@ Frontend/
 ├── src/
 │   ├── api/                    # cliente de la API y una función por consulta
 │   ├── components/             # piezas reutilizables (formularios, estados, etiquetas)
-│   ├── hooks/                  # useApi, useBusqueda, useRecorridos
+│   ├── hooks/                  # useApi, useBusqueda, useRecorridos, useFavoritos
 │   ├── session/                # sesión
 │   ├── theme/colors.ts         # paleta de VoyBus
 │   └── utils/                  # fechas y textos
@@ -95,17 +95,17 @@ Frontend/
 
 ## Requisitos cubiertos
 
-| Requisito | Pantallas                                                                        |
-| --------- | -------------------------------------------------------------------------------- |
-| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos |
-| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene       |
-| ACC-03    | Pestaña Cuenta: cerrar sesión                                                    |
-| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                              |
-| RED-01    | Pestaña Líneas y detalle de la línea (recorridos, días, horarios, paraderos)     |
-| RED-02    | Pestaña Paraderos y detalle del paradero (líneas que pasan)                      |
-| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                         |
-| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias         |
-| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia             |
+| Requisito | Pantallas                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos                |
+| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene                      |
+| ACC-03    | Pestaña Cuenta: cerrar sesión                                                                   |
+| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                             |
+| RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos |
+| RED-02    | Pestaña Paraderos (con favoritos) y detalle: líneas que pasan, sentidos y favorito              |
+| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                                        |
+| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias                        |
+| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                            |
 
 ## Pendiente
 

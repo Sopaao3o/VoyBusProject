@@ -149,3 +149,27 @@ test('Los datos de ejemplo cumplen los mínimos pedidos', async () => {
   assert.equal(await models.Vehiculo.count(), 10);
   assert.equal(await models.Usuario.count(), 5);
 });
+
+// ───── Inicio y término de las líneas, sentidos de los paraderos ─────
+test('RED-01: cada línea indica su punto de inicio y de término', async () => {
+  const { data } = (await get('/lineas')).body;
+  const l103 = data.find((l) => l.codigo === '103');
+  assert.equal(l103.punto_inicio, 'Terminal Rodoviario');
+  assert.equal(l103.punto_termino, 'Universidad de Antofagasta');
+
+  const detalle = (await get(`/lineas/${l103.id}`)).body.data;
+  assert.equal(detalle.punto_inicio, 'Terminal Rodoviario');
+  assert.equal(detalle.punto_termino, 'Universidad de Antofagasta');
+});
+
+test('RED-02: el paradero indica en qué sentidos pasa cada línea', async () => {
+  const { data } = (await get('/paraderos/2')).body;
+  for (const linea of data.lineas) {
+    assert.deepEqual(linea.sentidos, ['ida', 'vuelta']);
+    assert.deepEqual(
+      linea.recorridos.map((r) => r.sentido),
+      ['ida', 'vuelta'],
+    );
+    assert.ok(linea.recorridos.every((r) => Number.isInteger(r.id)));
+  }
+});

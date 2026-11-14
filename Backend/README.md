@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (121)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (127)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -47,6 +47,7 @@ Backend/
 │   ├── modules/
 │   │   ├── auth/               # ACC-01 a ACC-04
 │   │   ├── red/                # RED-01 y RED-02
+│   │   ├── favoritos/          # RED-02: paraderos favoritos
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
 │   │   └── viajes/             # VIA-02 y simulador
@@ -333,13 +334,23 @@ Reglas de ACC-04:
 
 ### Red de transporte (RED-01, RED-02) · públicos
 
-| Método y ruta                | Descripción                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| `GET /api/v1/lineas?q=`      | Líneas activas y suspendidas (con aviso). `q` busca por código o nombre, sin tildes. |
-| `GET /api/v1/lineas/:id`     | Línea con sus recorridos (ida/vuelta), días, horarios y paraderos en orden.          |
-| `GET /api/v1/recorridos/:id` | Un recorrido con sus paraderos ordenados.                                            |
-| `GET /api/v1/paraderos?q=`   | Paraderos activos con coordenadas.                                                   |
-| `GET /api/v1/paraderos/:id`  | Paradero y las líneas que pasan por él.                                              |
+| Método y ruta                | Descripción                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/lineas?q=`      | Líneas activas y suspendidas (con aviso), con su punto de inicio y de término. `q` busca por código o nombre, sin tildes. |
+| `GET /api/v1/lineas/:id`     | Línea con sus recorridos (ida/vuelta), días, horarios y paraderos en orden.                                               |
+| `GET /api/v1/recorridos/:id` | Un recorrido con sus paraderos ordenados.                                                                                 |
+| `GET /api/v1/paraderos?q=`   | Paraderos activos con coordenadas.                                                                                        |
+| `GET /api/v1/paraderos/:id`  | Paradero y las líneas que pasan por él, con los sentidos (recorridos) de cada una.                                        |
+
+### Paraderos favoritos (RED-02) · pasajero registrado
+
+Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_INVITADA`.
+
+| Método y ruta                            | Descripción                                              |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `GET /api/v1/favoritos/paraderos`        | Paraderos favoritos de la cuenta, por nombre.            |
+| `PUT /api/v1/favoritos/paraderos/:id`    | Guarda el paradero como favorito (repetirlo no falla).   |
+| `DELETE /api/v1/favoritos/paraderos/:id` | Lo quita de los favoritos (si no estaba, tampoco falla). |
 
 ### Gestión de turnos (ADM-03) · administrador
 
