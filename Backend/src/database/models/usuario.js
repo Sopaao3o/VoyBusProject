@@ -29,6 +29,7 @@ module.exports = (sequelize) =>
       token_recuperacion: DataTypes.STRING,
       token_recuperacion_expira: DataTypes.STRING,
       fecha_registro: DataTypes.STRING,
+      google_sub: DataTypes.STRING,
     },
     { tableName: 'usuarios', timestamps: false },
   );

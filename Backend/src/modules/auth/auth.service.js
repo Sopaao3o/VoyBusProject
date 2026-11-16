@@ -806,6 +806,90 @@ function createAuthService(
       return { ...respuesta, codigo, expira_en: expira };
     },
 
+    /**
+     * ACC-01/ACC-02: entrada con Google. El perfil ya viene validado por Google (src/utils/google.js).
+     * - Si la cuenta de Google ya está vinculada, entra a esa cuenta.
+     * - Si el correo ya tiene una cuenta de pasajero, la vincula (Google verificó el correo), para
+     *   no crear dos cuentas con el mismo correo.
+     * - Si no existe, crea una cuenta de pasajero verificada (el registro público solo crea pasajeros).
+     * Respeta las mismas reglas que el inicio de sesión: cuentas deshabilitadas y verificación en
+     * dos pasos. Conductores y administradores entran solo con su contraseña.
+     */
+    async iniciarConGoogle({ sub, correo, correoVerificado, nombre }) {
+      if (!sub || !correo || !correoVerificado) {
+        throw new HttpError(403, 'Tu cuenta de Google no tiene un correo verificado', {
+          code: 'GOOGLE_CORREO_NO_VERIFICADO',
+        });
+      }
+
+      const ahoraIso = ahora().toISOString();
+      const usuario = await sequelize.transaction(async (transaction) => {
+        let cuenta = await Usuario.findOne({ where: { google_sub: sub }, transaction });
+        if (!cuenta) cuenta = await Usuario.findOne({ where: { correo }, transaction });
+
+        if (!cuenta) {
+          const nombreVisible = String(nombre || '')
+            .trim()
+            .slice(0, 80);
+          return Usuario.create(
+            {
+              rol: 'pasajero',
+              nombre_visible: nombreVisible.length >= 2 ? nombreVisible : 'Pasajero',
+              correo,
+              google_sub: sub,
+              estado: 'habilitado',
+              tipo_acceso: 'registrado',
+              correo_verificado: 1,
+              terminos_aceptados_en: ahoraIso, // la app los muestra antes de continuar con Google
+              fecha_registro: ahoraIso,
+            },
+            { transaction },
+          );
+        }
+
+        if (cuenta.rol !== 'pasajero') {
+          throw new HttpError(
+            403,
+            'Las cuentas de conductor y administrador ingresan con su correo y contraseña',
+            { code: 'GOOGLE_SOLO_PASAJEROS' },
+          );
+        }
+        if (cuenta.estado === 'deshabilitado') {
+          throw new HttpError(403, 'La cuenta está deshabilitada. Contacta al administrador', {
+            code: 'CUENTA_DESHABILITADA',
+          });
+        }
+        if (cuenta.google_sub && cuenta.google_sub !== sub) {
+          throw new HttpError(409, 'Este correo ya está vinculado a otra cuenta de Google', {
+            code: 'GOOGLE_OTRA_CUENTA',
+          });
+        }
+
+        // Vincular: Google ya verificó el correo, así que una cuenta pendiente queda habilitada.
+        const cambios = { google_sub: sub, correo_verificado: 1 };
+        if (cuenta.estado === 'sin_verificar') {
+          Object.assign(cambios, {
+            estado: 'habilitado',
+            codigo_verificacion: null,
+            codigo_verificacion_expira: null,
+            canal_verificacion: null,
+          });
+        }
+        await cuenta.update(cambios, { transaction });
+        return cuenta;
+      });
+
+      // Igual que en ACC-02: con la verificación en dos pasos activa, falta el código.
+      if (usuario.dos_factores_activo && usuario.dos_factores_secreto) {
+        return {
+          requiere_2fa: true,
+          usuario: usuarioPublico(usuario),
+          ...firmarDesafio2fa(usuario),
+        };
+      }
+      return { usuario: usuarioPublico(usuario), ...firmarToken(usuario) };
+    },
+
     /** Acceso como invitado: una cuenta de pasajero temporal, sin correo ni contraseña. */
     async registrarInvitado() {
       const usuario = await sequelize.transaction((transaction) =>

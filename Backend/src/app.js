@@ -8,6 +8,8 @@ const { crearAutenticacion } = require('./middleware/auth');
 const { createAuthService } = require('./modules/auth/auth.service');
 const { createAuthController } = require('./modules/auth/auth.controller');
 const { createAuthRoutes } = require('./modules/auth/auth.routes');
+const { createGoogleFlujo } = require('./modules/auth/google.flujo');
+const { createGoogleOAuth } = require('./utils/google');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
@@ -35,6 +37,7 @@ const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/
  * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
  * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
  * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
+ * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
  */
 function createApp({
   models,
@@ -43,6 +46,7 @@ function createApp({
   simulador = false,
   exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
   exponerTokenRecuperacion = exponerCodigoVerificacion,
+  google = createGoogleOAuth(),
 }) {
   const app = express();
 
@@ -53,9 +57,11 @@ function createApp({
   app.use('/api/health', healthRoutes);
 
   const conductor = createConductorController(createConductorService(models, { ahora }));
-  const auth = createAuthController(createAuthService(models, { ahora }), {
+  const authService = createAuthService(models, { ahora });
+  const auth = createAuthController(authService, {
     exponerCodigoVerificacion,
     exponerTokenRecuperacion,
+    googleFlujo: createGoogleFlujo({ google, service: authService, ahora }),
   });
   const v1 = express.Router();
   const autenticar = crearAutenticacion({ models });

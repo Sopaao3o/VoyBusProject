@@ -186,7 +186,27 @@ const cambioPasswordBody = z
   })
   .superRefine(confirmacionCoincide);
 
+// ACC-01/ACC-02: inicio de sesión con Google. `retorno` es el enlace para volver a la app.
+const googlePrepararBody = z.object({
+  retorno: z
+    .string({ error: 'Falta la dirección de retorno a la app' })
+    .trim()
+    .min(1, 'Falta la dirección de retorno a la app')
+    .max(500, 'La dirección de retorno a la app es demasiado larga'),
+});
+
+// Código de un solo uso con el que la app retira la sesión de Google.
+const googleCanjeBody = z.object({
+  codigo: z
+    .string({ error: 'Falta el código de Google' })
+    .trim()
+    .min(1, 'Falta el código de Google')
+    .max(200, 'El código de Google no es válido'),
+});
+
 module.exports = {
+  googleCanjeBody,
+  googlePrepararBody,
   registroBody,
   verificacionBody,
   reenvioBody,

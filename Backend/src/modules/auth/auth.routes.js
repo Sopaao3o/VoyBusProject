@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const { validar } = require('../../middleware/validar');
 const {
+  googleCanjeBody,
+  googlePrepararBody,
   registroBody,
   sesionBody,
   verificacionBody,
@@ -62,6 +64,11 @@ function createAuthRoutes(controller, { autenticar } = {}) {
   );
   router.post('/reenviar-codigo', validar({ body: reenvioBody }), controller.reenviarCodigo);
   router.post('/invitado', controller.registrarInvitado);
+
+  // Inicio de sesión con Google: se abre en el navegador del teléfono (ver google.flujo.js).
+  router.post('/google/preparar', validar({ body: googlePrepararBody }), controller.googlePreparar);
+  router.get('/google/callback', controller.googleCallback);
+  router.post('/google/canjear', validar({ body: googleCanjeBody }), controller.googleCanjear);
 
   return router;
 }

@@ -5,7 +5,13 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { entrarComoInvitado, registrarPasajero } from '../src/api/auth';
 import { textoDeError } from '../src/api/client';
-import type { CanalVerificacion, RegistroPasajeroBody, UsuarioSesion } from '../src/api/tipos';
+import type {
+  CanalVerificacion,
+  RegistroPasajeroBody,
+  RespuestaInicioSesion,
+  UsuarioSesion,
+} from '../src/api/tipos';
+import { BotonGoogle } from '../src/components/BotonGoogle';
 import { CajaError } from '../src/components/Estados';
 import { Boton, Campo, CampoPassword, Selector } from '../src/components/Formulario';
 import { ReglasPassword } from '../src/components/ReglasPassword';
@@ -112,6 +118,15 @@ export default function RegistroScreen() {
     }
   }
 
+  /** ACC-01 con Google: crea (o vincula) la cuenta y entra. Si pide 2FA, se completa en el login. */
+  function usarRespuestaGoogle(respuesta: RespuestaInicioSesion) {
+    if ('requiere_2fa' in respuesta) {
+      router.replace({ pathname: '/login', params: { desafio: respuesta.desafio } });
+    } else {
+      usarSesion(respuesta.usuario, respuesta.token);
+    }
+  }
+
   async function entrarInvitado() {
     setError(null);
     setEnviando(true);
@@ -134,6 +149,13 @@ export default function RegistroScreen() {
         Con tu cuenta puedes solicitar paradas y viajar con VoyBus. Es gratis y toma menos de un
         minuto.
       </Text>
+
+      <BotonGoogle onResultado={usarRespuestaGoogle} onError={setError} deshabilitado={enviando} />
+      <Text style={styles.legal}>
+        Al continuar con Google aceptas la política de privacidad y los términos de uso de VoyBus.
+        Tu correo queda verificado por Google.
+      </Text>
+      <Text style={styles.oCorreo}>o crea tu cuenta con correo o teléfono</Text>
 
       <Selector
         etiqueta="Verificar con"
@@ -246,5 +268,7 @@ const styles = StyleSheet.create({
   },
   terminosTexto: { flex: 1, fontSize: 14, color: colors.text },
   separador: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
+  legal: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
+  oCorreo: { textAlign: 'center', color: colors.textMuted, marginTop: 4 },
   invitadoTitulo: { fontSize: 16, fontWeight: '700', color: colors.text },
 });

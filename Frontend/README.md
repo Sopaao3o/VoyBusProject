@@ -61,6 +61,8 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
 - Como el backend no tiene servicio de correo ni SMS, en desarrollo el código de verificación y
   el código del enlace de recuperación llegan en la respuesta y la app los muestra.
+- **Continuar con Google** (en Iniciar sesión y en Crear cuenta) abre el navegador del teléfono y
+  vuelve a la app. Necesita que el backend tenga Google configurado (ver `Backend/README.md`).
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
   La app muestra el código QR, y también permite abrir la aplicación instalada en el mismo
   teléfono o copiar la clave a mano.
@@ -72,7 +74,8 @@ Frontend/
 ├── app/                        # pantallas (Expo Router: cada archivo es una ruta)
 │   ├── _layout.tsx             # navegación principal y sesión
 │   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, flota, mis-turnos, viajar, usuario
-│   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde)
+│   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde) y Google
+│   ├── google.tsx              # ACC-01/02: retorno desde Google (solo se cierra)
 │   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
 │   ├── verificar.tsx           # ACC-01: código de verificación del contacto (y reenvío)
 │   ├── dos-factores.tsx        # ACC-01: activar o desactivar la verificación en dos pasos
@@ -98,8 +101,8 @@ Frontend/
 
 | Requisito | Pantallas                                                                                                                                                    |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ACC-01    | Crear cuenta de pasajero, verificar código, invitado y verificación en dos pasos                                                                             |
-| ACC-02    | Iniciar sesión con correo o teléfono, con código 2FA si la cuenta lo tiene                                                                                   |
+| ACC-01    | Crear cuenta con correo, teléfono o Google; verificar código, invitado y verificación en dos pasos                                                           |
+| ACC-02    | Iniciar sesión con correo, teléfono o Google, con código 2FA si la cuenta lo tiene                                                                           |
 | ACC-03    | Pestaña Cuenta: cerrar sesión                                                                                                                                |
 | ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                                                                                          |
 | RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos                                                              |

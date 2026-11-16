@@ -1,10 +1,11 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { entrarComoInvitado, iniciarSesion, verificarSegundoFactor } from '../src/api/auth';
 import { ApiError, textoDeError } from '../src/api/client';
-import type { CanalVerificacion } from '../src/api/tipos';
+import type { CanalVerificacion, RespuestaInicioSesion } from '../src/api/tipos';
+import { BotonGoogle } from '../src/components/BotonGoogle';
 import { CajaError } from '../src/components/Estados';
 import { Boton, Campo, CampoPassword, Selector } from '../src/components/Formulario';
 import { useUsuario } from '../src/session/UsuarioContext';
@@ -19,7 +20,9 @@ export default function LoginScreen() {
   const [canal, setCanal] = useState<CanalVerificacion>('correo');
   const [contacto, setContacto] = useState('');
   const [password, setPassword] = useState('');
-  const [desafio, setDesafio] = useState<string | null>(null);
+  // Si se llega desde el registro con Google y la cuenta pide 2FA, el desafío viene en la ruta.
+  const parametros = useLocalSearchParams<{ desafio?: string }>();
+  const [desafio, setDesafio] = useState<string | null>(parametros.desafio ?? null);
   const [codigo, setCodigo] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +70,17 @@ export default function LoginScreen() {
         entrar(respuesta);
       }
     });
+  }
+
+  /** Respuesta de Google: la sesión, o el desafío si la cuenta tiene verificación en dos pasos. */
+  function usarRespuestaGoogle(respuesta: RespuestaInicioSesion) {
+    setError(null);
+    if ('requiere_2fa' in respuesta) {
+      setDesafio(respuesta.desafio);
+      setCodigo('');
+    } else {
+      entrar(respuesta);
+    }
   }
 
   function enviarCodigo() {
@@ -170,6 +184,11 @@ export default function LoginScreen() {
         onPress={enviarCredenciales}
         deshabilitado={enviando}
       />
+      <Text style={styles.separadorTexto}>o</Text>
+      <BotonGoogle onResultado={usarRespuestaGoogle} onError={setError} deshabilitado={enviando} />
+      <Text style={styles.legal}>
+        Al continuar con Google aceptas la política de privacidad y los términos de uso de VoyBus.
+      </Text>
       <Boton
         titulo="Olvidé mi contraseña"
         variante="secundario"
@@ -200,4 +219,6 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 20, fontWeight: '700', color: colors.text },
   ayuda: { fontSize: 14, color: colors.textMuted },
   separador: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
+  separadorTexto: { textAlign: 'center', color: colors.textMuted },
+  legal: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
 });

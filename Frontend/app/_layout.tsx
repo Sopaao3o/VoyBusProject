@@ -44,6 +44,7 @@ function Navegacion() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ title: 'Iniciar sesión' }} />
+      <Stack.Screen name="google" options={{ headerShown: false, animation: 'none' }} />
       <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
       <Stack.Screen name="verificar" options={{ title: 'Verificar cuenta' }} />
       <Stack.Screen name="recuperar" options={{ title: 'Recuperar contraseña' }} />

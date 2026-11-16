@@ -23,7 +23,7 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 | `npm run dev`          | Arranca con recarga automática                                 |
 | `npm run db:migrar`    | Aplica las migraciones pendientes                              |
 | `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (127)                          |
+| `npm test`             | Ejecuta las pruebas automáticas (137)                          |
 | `npm run lint`         | Revisa el código con ESLint                                    |
 | `npm run format`       | Da formato a todos los archivos con Prettier                   |
 | `npm run format:check` | Comprueba el formato sin modificar nada                        |
@@ -100,6 +100,36 @@ Las cuentas de ejemplo usan la contraseña `Clave123!` y correos `@voybus.cl`; s
 - `3` María Soto · conductor · `maria.soto@voybus.cl`
 - `4` Luis Pérez · conductor deshabilitado · `luis.perez@voybus.cl`
 - `5` Ana Pasajera · pasajero · `ana.pasajera@voybus.cl`
+
+## Inicio de sesión con Google (ACC-01, ACC-02)
+
+Funciona en Expo Go (Android y iPhone) y no tiene costo. La app pide al backend la dirección de
+Google y un código propio, abre Google en el navegador del teléfono y, al volver (o al cerrar la
+pestaña), cambia su código por el JWT de siempre. La clave secreta de Google y el JWT nunca viajan
+en una URL.
+
+| Método y ruta                       | Descripción                                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `POST /api/v1/auth/google/preparar` | Cuerpo `{ "retorno" }` (enlace `exp://` o `voybus://` de la app). Responde `{ url, codigo }`.                   |
+| `GET /api/v1/auth/google/callback`  | Google vuelve aquí. En iPhone regresa solo a la app; en Android (Expo Go) pide cerrar la pestaña.               |
+| `POST /api/v1/auth/google/canjear`  | Cuerpo `{ "codigo" }`. Responde igual que `iniciar-sesion`; `409 GOOGLE_PENDIENTE` si aún no termina en Google. |
+
+Reglas: solo pasajeros (conductores y administradores usan su contraseña); si el correo ya tiene
+cuenta de pasajero se vincula en vez de duplicarla; una cuenta deshabilitada no entra; con 2FA
+activo se pide el código igual que en ACC-02.
+
+**Configuración (una vez):**
+
+1. **Túnel HTTPS gratis.** Google solo vuelve a direcciones `https`. Crea una cuenta gratis en
+   ngrok, copia tu dominio fijo (`tu-dominio.ngrok-free.dev`) y ejecuta `ngrok http --url=tu-dominio.ngrok-free.dev 3000`
+   mientras pruebas. La primera vez ngrok muestra un aviso en el navegador: pulsa **Visit**.
+2. **Google Cloud Console** (gratis): crea un proyecto → _Google Auth Platform_ → pantalla de
+   consentimiento **Externa** en modo **Prueba**, y agrega como usuarios de prueba los correos que
+   van a entrar (el equipo y los profesores).
+3. **Cliente OAuth** de tipo **Aplicación web**, con este URI de redireccionamiento autorizado:
+   `https://tu-dominio.ngrok-free.dev/api/v1/auth/google/callback`.
+4. En `Backend/.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `URL_PUBLICA=https://tu-dominio.ngrok-free.dev`.
+   El `.env` no se sube al repositorio.
 
 Seguridad de las cuentas:
 

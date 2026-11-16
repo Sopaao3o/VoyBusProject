@@ -77,3 +77,18 @@ export const restablecerPassword = (token: string, password: string, confirmacio
 
 export const cambiarPassword = (body: CambioPasswordBody) =>
   api<RespuestaCambioPassword>('/auth/cambiar-password', { method: 'POST', body }).then(dato);
+
+// ACC-01/ACC-02: inicio de sesión con Google.
+// 1) preparar: el backend devuelve la dirección de Google y un código propio de la app.
+// 2) la app abre esa dirección en el navegador; 3) al volver, canjea su código por la sesión.
+export const prepararGoogle = (retorno: string) =>
+  api<{ url: string; codigo: string }>('/auth/google/preparar', {
+    method: 'POST',
+    body: { retorno },
+  }).then(dato);
+
+/** Cambia el código por la sesión (o por el desafío de 2FA, como en ACC-02). */
+export const canjearCodigoGoogle = (codigo: string) =>
+  api<RespuestaInicioSesion>('/auth/google/canjear', { method: 'POST', body: { codigo } }).then(
+    dato,
+  );
