@@ -167,3 +167,10 @@ ios/build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# SQLite en modo WAL (archivos auxiliares de la base de datos)
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

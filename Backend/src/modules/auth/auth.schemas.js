@@ -1,0 +1,221 @@
+// Esquemas Zod de ACC-01 (registro y verificación), ACC-02 (inicio de sesión) y ACC-03 (cierre).
+const { z } = require('zod');
+
+/** Convierte los campos de texto vacíos en "no enviados" (útil cuando el formulario usa uno u otro). */
+const opcional = (esquema) =>
+  z.preprocess((valor) => {
+    if (typeof valor === 'string' && valor.trim() === '') return undefined;
+    return valor;
+  }, esquema.optional());
+
+const correoObligatorio = z
+  .string({ error: 'El correo electrónico debe ser un texto' })
+  .trim()
+  .toLowerCase()
+  .pipe(z.email('El correo electrónico no es válido'));
+
+const correo = opcional(correoObligatorio);
+
+const telefono = opcional(
+  z
+    .string({ error: 'El teléfono debe ser un texto' })
+    .trim()
+    // Acepta +56 9 1234 5678, (56) 9-1234-5678, etc. Se guarda solo con dígitos.
+    .transform((valor) => valor.replace(/\D/g, ''))
+    .pipe(z.string().regex(/^\d{8,15}$/, 'El teléfono debe tener entre 8 y 15 dígitos')),
+);
+
+// La contraseña se valida sin recortar espacios: un espacio no cuenta como símbolo.
+const password = z
+  .string({ error: 'La contraseña es obligatoria' })
+  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .max(15, 'La contraseña debe tener como máximo 15 caracteres')
+  .regex(/\p{Lu}/u, 'La contraseña debe incluir al menos una letra mayúscula')
+  .regex(/\p{Ll}/u, 'La contraseña debe incluir al menos una letra minúscula')
+  .regex(/\d/, 'La contraseña debe incluir al menos un número')
+  .regex(/[^\p{L}\p{N}\s]/u, 'La contraseña debe incluir al menos un símbolo');
+
+const registroBody = z
+  .object({
+    nombre: z
+      .string({ error: 'El nombre es obligatorio' })
+      .trim()
+      .min(2, 'El nombre debe tener al menos 2 caracteres')
+      .max(80, 'El nombre admite hasta 80 caracteres'),
+    correo,
+    telefono,
+    password,
+    confirmacion: z.string({ error: 'Debes confirmar la contraseña' }),
+    acepta_terminos: z.literal(true, {
+      error: 'Debes aceptar los términos de privacidad para crear la cuenta',
+    }),
+  })
+  .superRefine((datos, ctx) => {
+    if (!datos.correo && !datos.telefono) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['correo'],
+        message: 'Debes indicar un correo electrónico o un teléfono',
+      });
+    }
+    if (datos.password !== datos.confirmacion) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['confirmacion'],
+        message: 'La confirmación no coincide con la contraseña',
+      });
+    }
+  });
+
+/** Exige exactamente uno de los dos medios de contacto. */
+function unSoloContacto(datos, ctx) {
+  const contactos = [datos.correo, datos.telefono].filter(Boolean);
+  if (contactos.length === 0) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['correo'],
+      message: 'Indica el correo o el teléfono con el que te registraste',
+    });
+  }
+  if (contactos.length > 1) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['telefono'],
+      message: 'Indica solo un medio de contacto: el correo o el teléfono',
+    });
+  }
+}
+
+const verificacionBody = z
+  .object({
+    correo,
+    telefono,
+    codigo: z
+      .string({ error: 'El código de verificación es obligatorio' })
+      .trim()
+      .regex(/^\d{6}$/, 'El código de verificación debe tener 6 dígitos'),
+  })
+  .superRefine(unSoloContacto);
+
+// ACC-01: pedir un código nuevo cuando el anterior venció o no llegó.
+const reenvioBody = z.object({ correo, telefono }).superRefine(unSoloContacto);
+
+// ACC-02: para iniciar sesión no se exige la complejidad de una contraseña nueva,
+// solo que venga escrita. Así una cuenta antigua también puede ingresar.
+const passwordIngreso = z
+  .string({ error: 'La contraseña es obligatoria' })
+  .min(1, 'La contraseña es obligatoria')
+  .max(100, 'La contraseña es demasiado larga');
+
+const sesionBody = z
+  .object({
+    correo,
+    telefono,
+    password: passwordIngreso,
+  })
+  .superRefine(unSoloContacto);
+
+// ACC-03: la confirmación explícita evita cierres de sesión accidentales.
+const cierreSesionBody = z.object({
+  confirmar: z.literal(true, {
+    error: 'Debes confirmar que quieres cerrar la sesión',
+  }),
+});
+
+// ACC-01 y ACC-02: códigos de 6 dígitos de la aplicación autenticadora (TOTP).
+const codigo2fa = z
+  .string({ error: 'El código de verificación en dos pasos es obligatorio' })
+  .trim()
+  .regex(/^\d{6}$/, 'El código de verificación en dos pasos debe tener 6 dígitos');
+
+const confirmar2faBody = z.object({ codigo: codigo2fa });
+
+const verificar2faBody = z.object({
+  desafio: z
+    .string({ error: 'Falta el desafío de verificación en dos pasos' })
+    .trim()
+    .min(1, 'Falta el desafío de verificación en dos pasos')
+    .max(4000, 'El desafío de verificación en dos pasos no es válido'),
+  codigo: codigo2fa,
+});
+
+const desactivar2faBody = z.object({
+  password_actual: passwordIngreso,
+  codigo: codigo2fa,
+});
+
+// ACC-04: la nueva contraseña exige 8 caracteres con letras y números; el símbolo es
+// recomendado, no obligatorio. El máximo evita cadenas que bcrypt tendría que truncar.
+const passwordNueva = z
+  .string({ error: 'La nueva contraseña es obligatoria' })
+  .min(8, 'La nueva contraseña debe tener al menos 8 caracteres')
+  .max(64, 'La nueva contraseña admite hasta 64 caracteres')
+  .regex(/\p{L}/u, 'La nueva contraseña debe incluir al menos una letra')
+  .regex(/\d/, 'La nueva contraseña debe incluir al menos un número');
+
+/** La confirmación debe coincidir exactamente con la contraseña nueva. */
+function confirmacionCoincide(datos, ctx) {
+  if (datos.password !== datos.confirmacion) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['confirmacion'],
+      message: 'La confirmación no coincide con la nueva contraseña',
+    });
+  }
+}
+
+const recuperacionBody = z.object({ correo: correoObligatorio });
+
+const restablecerPasswordBody = z
+  .object({
+    token: z
+      .string({ error: 'El enlace de recuperación es obligatorio' })
+      .trim()
+      .min(1, 'El enlace de recuperación es obligatorio')
+      .max(200, 'El enlace de recuperación no es válido'),
+    password: passwordNueva,
+    confirmacion: z.string({ error: 'Debes confirmar la nueva contraseña' }),
+  })
+  .superRefine(confirmacionCoincide);
+
+const cambioPasswordBody = z
+  .object({
+    password_actual: passwordIngreso,
+    password: passwordNueva,
+    confirmacion: z.string({ error: 'Debes confirmar la nueva contraseña' }),
+  })
+  .superRefine(confirmacionCoincide);
+
+// ACC-01/ACC-02: inicio de sesión con Google. `retorno` es el enlace para volver a la app.
+const googlePrepararBody = z.object({
+  retorno: z
+    .string({ error: 'Falta la dirección de retorno a la app' })
+    .trim()
+    .min(1, 'Falta la dirección de retorno a la app')
+    .max(500, 'La dirección de retorno a la app es demasiado larga'),
+});
+
+// Código de un solo uso con el que la app retira la sesión de Google.
+const googleCanjeBody = z.object({
+  codigo: z
+    .string({ error: 'Falta el código de Google' })
+    .trim()
+    .min(1, 'Falta el código de Google')
+    .max(200, 'El código de Google no es válido'),
+});
+
+module.exports = {
+  googleCanjeBody,
+  googlePrepararBody,
+  registroBody,
+  verificacionBody,
+  reenvioBody,
+  sesionBody,
+  cierreSesionBody,
+  recuperacionBody,
+  restablecerPasswordBody,
+  cambioPasswordBody,
+  confirmar2faBody,
+  verificar2faBody,
+  desactivar2faBody,
+};

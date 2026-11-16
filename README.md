@@ -18,9 +18,9 @@ VoyBus propone una aplicación móvil que permite consultar paraderos y visualiz
 
 | Componente | Tecnología |
 |---|---|
-| App móvil | React Native con Expo |
-| Backend | Node.js + Express (API REST) |
-| Base de datos | SQLite |
+| App móvil | React Native con Expo, TypeScript y Expo Router |
+| Backend | Node.js + Express 5 (API REST) |
+| Base de datos | SQLite con Sequelize y migraciones (Umzug) |
 
 ## Estructura del repositorio
 
@@ -36,7 +36,7 @@ Cada carpeta tiene su propio `package.json` y su propio README con las instrucci
 ## Cómo ejecutar
 
 1. **Backend:** ver [`Backend/README.md`](Backend/README.md).
-2. **App móvil:** pendiente de crear (se generará con `create-expo-app` dentro de `Frontend/`).
+2. **App móvil:** ver [`Frontend/README.md`](Frontend/README.md).
 
 ## Flujo de trabajo
 
