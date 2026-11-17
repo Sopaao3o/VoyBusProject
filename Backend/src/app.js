@@ -4,9 +4,18 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const healthRoutes = require('./routes/health.routes');
+const { crearAutenticacion } = require('./middleware/auth');
+const { createAuthService } = require('./modules/auth/auth.service');
+const { createAuthController } = require('./modules/auth/auth.controller');
+const { createAuthRoutes } = require('./modules/auth/auth.routes');
+const { createGoogleFlujo } = require('./modules/auth/google.flujo');
+const { createGoogleOAuth } = require('./utils/google');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
+const { createFavoritosService } = require('./modules/favoritos/favoritos.service');
+const { createFavoritosController } = require('./modules/favoritos/favoritos.controller');
+const { createFavoritosRoutes } = require('./modules/favoritos/favoritos.routes');
 const { createTurnosService } = require('./modules/turnos/turnos.service');
 const { createTurnosController } = require('./modules/turnos/turnos.controller');
 const { createTurnosRoutes } = require('./modules/turnos/turnos.routes');
@@ -26,8 +35,19 @@ const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
  * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
+ * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
+ * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
+ * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
  */
-function createApp({ models, registro = false, ahora, simulador = false }) {
+function createApp({
+  models,
+  registro = false,
+  ahora,
+  simulador = false,
+  exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
+  exponerTokenRecuperacion = exponerCodigoVerificacion,
+  google = createGoogleOAuth(),
+}) {
   const app = express();
 
   app.use(cors());
@@ -37,13 +57,30 @@ function createApp({ models, registro = false, ahora, simulador = false }) {
   app.use('/api/health', healthRoutes);
 
   const conductor = createConductorController(createConductorService(models, { ahora }));
+  const authService = createAuthService(models, { ahora });
+  const auth = createAuthController(authService, {
+    exponerCodigoVerificacion,
+    exponerTokenRecuperacion,
+    googleFlujo: createGoogleFlujo({ google, service: authService, ahora }),
+  });
   const v1 = express.Router();
+  const autenticar = crearAutenticacion({ models });
+  v1.use('/auth', createAuthRoutes(auth, { autenticar }));
   v1.use(createRedRoutes(createRedController(createRedService(models))));
-  v1.use('/admin', createTurnosRoutes(createTurnosController(createTurnosService(models))));
-  v1.use('/admin', createConductorAdminRoutes(conductor));
-  v1.use('/conductor', createConductorRoutes(conductor));
+  v1.use(
+    '/favoritos',
+    autenticar,
+    createFavoritosRoutes(createFavoritosController(createFavoritosService(models))),
+  );
+  v1.use(
+    '/admin',
+    autenticar,
+    createTurnosRoutes(createTurnosController(createTurnosService(models))),
+  );
+  v1.use('/admin', autenticar, createConductorAdminRoutes(conductor));
+  v1.use('/conductor', autenticar, createConductorRoutes(conductor));
   const viajes = createViajesController(createViajesService(models, { ahora }));
-  v1.use('/viajes', createViajesRoutes(viajes));
+  v1.use('/viajes', autenticar, createViajesRoutes(viajes));
   if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));
   app.use('/api/v1', v1);
 

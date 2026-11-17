@@ -20,7 +20,7 @@ export default function TurnosScreen() {
   const filtro = fechaValida(fecha) ? fecha : '';
   const { datos, cargando, error, recargar } = useApi(
     () => listarTurnos(filtro),
-    [filtro, usuario.id],
+    [filtro, usuario?.id ?? null],
   );
 
   // Al volver desde crear/editar, la lista se actualiza sola.
@@ -30,7 +30,7 @@ export default function TurnosScreen() {
     }, [recargar]),
   );
 
-  if (usuario.rol !== 'administrador') {
+  if (usuario?.rol !== 'administrador') {
     return <ErrorMensaje mensaje="Esta sección es solo para el administrador." />;
   }
 

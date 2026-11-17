@@ -6,6 +6,7 @@ const { createDatabase } = require('../src/config/database');
 const { createMigrator } = require('../src/database/migrator');
 const { initModels } = require('../src/database/models');
 const { cargarDatosEjemplo } = require('../src/database/seeders/datos-ejemplo');
+const { tokenPara } = require('./auth-helpers');
 
 let server, base, sequelize, models;
 const reloj = new Date('2026-12-01T09:00:00Z');
@@ -27,9 +28,11 @@ test.after(async () => {
 
 // 5 = Ana (pasajera), 2 = Carlos y 3 = María (conductores), 1 = admin
 const call = async (method, path, { as = 5, body } = {}) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (as) headers.Authorization = `Bearer ${tokenPara(as)}`;
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(as ? { 'x-user-id': String(as) } : {}) },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, body: await res.json() };
@@ -186,8 +189,8 @@ test('VIA-02: las solicitudes de un mismo paradero se agrupan para el conductor 
     { rol: 'pasajero', nombre_visible: 'Sofía Rivas', alias: 'sofia' },
   ]);
   await solicitar(v, 7, 5);
-  await solicitar(v, 7, extra[0].id);
-  await solicitar(v, 4, extra[1].id);
+  await solicitar(v, 7, extra[0]);
+  await solicitar(v, 4, extra[1]);
   const r = await call('GET', `/conductor/viajes/${v}/solicitudes-parada`, { as: 3 });
   assert.equal(r.status, 200);
   assert.deepEqual(

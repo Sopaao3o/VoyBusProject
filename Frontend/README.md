@@ -43,36 +43,55 @@ Funciona sin servicios de pago: se prueba con **Expo Go** y el backend local.
 | `npm run format`       | Da formato a todos los archivos con Prettier |
 | `npm run format:check` | Comprueba el formato sin modificar nada      |
 
-## Usuario de prueba
+## Sesión y cuentas
 
-Todavía no hay inicio de sesión. La pestaña **Usuario** permite elegir un usuario de ejemplo
-(pasajero, conductor o administrador) y la app envía su id en el encabezado `x-user-id`, igual que
-el placeholder del backend. Cuando existan las sesiones, solo hay que cambiar
-`src/api/client.ts` y `src/session/UsuarioContext.tsx`.
+Las líneas y los paraderos se consultan sin cuenta. Lo demás exige iniciar sesión en la pestaña
+**Cuenta**; la app envía el JWT en el encabezado `Authorization: Bearer <token>`.
 
-| Rol           | Pestañas que ve                        |
-| ------------- | -------------------------------------- |
-| Pasajero      | Líneas, Paraderos, Viajar, Usuario     |
-| Conductor     | Líneas, Paraderos, Mis turnos, Usuario |
-| Administrador | Líneas, Paraderos, Turnos, Usuario     |
+Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña `Clave123!`:
+
+| Rol           | Correo                   | Pestañas que ve                          |
+| ------------- | ------------------------ | ---------------------------------------- |
+| Pasajero      | `ana.pasajera@voybus.cl` | Líneas, Paraderos, Viajar, Cuenta        |
+| Conductor     | `carlos.rojas@voybus.cl` | Líneas, Paraderos, Mis turnos, Cuenta    |
+| Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta    |
+| Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Flota, Cuenta |
+
+- La sesión se guarda cifrada en el teléfono (`expo-secure-store`): al reabrir la app sigue
+  iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
+- Como el backend no tiene servicio de correo ni SMS, en desarrollo el código de verificación y
+  el código del enlace de recuperación llegan en la respuesta y la app los muestra.
+- **Continuar con Google** (en Iniciar sesión y en Crear cuenta) abre el navegador del teléfono y
+  vuelve a la app. Necesita que el backend tenga Google configurado (ver `Backend/README.md`).
+- La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
+  La app muestra el código QR, y también permite abrir la aplicación instalada en el mismo
+  teléfono o copiar la clave a mano.
 
 ## Estructura
 
 ```
 Frontend/
 ├── app/                        # pantallas (Expo Router: cada archivo es una ruta)
-│   ├── _layout.tsx             # navegación principal y usuario de prueba
-│   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, mis-turnos, viajar, usuario
+│   ├── _layout.tsx             # navegación principal y sesión
+│   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, flota, mis-turnos, viajar, usuario
+│   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde) y Google
+│   ├── google.tsx              # ACC-01/02: retorno desde Google (solo se cierra)
+│   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
+│   ├── verificar.tsx           # ACC-01: código de verificación del contacto (y reenvío)
+│   ├── dos-factores.tsx        # ACC-01: activar o desactivar la verificación en dos pasos
+│   ├── recuperar.tsx           # ACC-04: recuperar la contraseña
+│   ├── cambiar-password.tsx    # ACC-04: cambiar la contraseña
 │   ├── linea/[id].tsx          # RED-01: línea con recorridos
 │   ├── paradero/[id].tsx       # RED-02: paradero con sus líneas
 │   ├── turno/                  # ADM-03: detalle y formulario de turnos
 │   ├── conductor/              # VEH-03: turno del conductor y solicitudes de parada
+│   ├── vehiculo/[id].tsx       # VEH-03: historial de estados e incidencias (administrador)
 │   └── viaje/[id].tsx          # VIA-02: elegir destino y solicitar parada
 ├── src/
 │   ├── api/                    # cliente de la API y una función por consulta
 │   ├── components/             # piezas reutilizables (formularios, estados, etiquetas)
-│   ├── hooks/                  # useApi, useBusqueda, useRecorridos
-│   ├── session/                # usuario de prueba
+│   ├── hooks/                  # useApi, useBusqueda, useRecorridos, useFavoritos
+│   ├── session/                # sesión
 │   ├── theme/colors.ts         # paleta de VoyBus
 │   └── utils/                  # fechas y textos
 └── .env.example
@@ -80,16 +99,19 @@ Frontend/
 
 ## Requisitos cubiertos
 
-| Requisito | Pantallas                                                                    |
-| --------- | ---------------------------------------------------------------------------- |
-| RED-01    | Pestaña Líneas y detalle de la línea (recorridos, días, horarios, paraderos) |
-| RED-02    | Pestaña Paraderos y detalle del paradero (líneas que pasan)                  |
-| VIA-02    | Pestaña Viajar: elegir viaje, destino y solicitar parada                     |
-| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias     |
-| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia         |
+| Requisito | Pantallas                                                                                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ACC-01    | Crear cuenta con correo, teléfono o Google; verificar código, invitado y verificación en dos pasos                                                           |
+| ACC-02    | Iniciar sesión con correo, teléfono o Google, con código 2FA si la cuenta lo tiene                                                                           |
+| ACC-03    | Pestaña Cuenta: cerrar sesión                                                                                                                                |
+| ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                                                                                          |
+| RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos                                                              |
+| RED-02    | Pestaña Paraderos (con favoritos) y detalle: líneas que pasan, sentidos y favorito                                                                           |
+| VIA-02    | Pestaña Viajar: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                            |
+| VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
+| ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente
 
-- Inicio de sesión real (Daslav) y vinculación al viaje por QR (VIA-01), que reemplaza la lista
-  provisoria de la pestaña Viajar.
+- Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de la pestaña Viajar.
 - Mapa con la ubicación de los vehículos.

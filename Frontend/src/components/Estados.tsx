@@ -37,7 +37,26 @@ export function Vacio({ mensaje }: { mensaje: string }) {
   );
 }
 
+/** Error de un formulario, mostrado sobre el botón de enviar. */
+export function CajaError({ mensaje }: { mensaje: string | null }) {
+  if (!mensaje) return null;
+  return (
+    <Text style={styles.cajaError} accessibilityRole="alert">
+      {mensaje}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
+  cajaError: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    color: colors.accent,
+    fontWeight: '600',
+  },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   error: { color: colors.accent, fontSize: 16, textAlign: 'center' },
   vacio: { color: colors.textMuted, fontSize: 16, textAlign: 'center' },

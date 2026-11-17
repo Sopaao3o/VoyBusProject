@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { colors } from '../theme/colors';
@@ -18,6 +20,45 @@ export function Campo({
         accessibilityLabel={etiqueta}
         {...props}
       />
+      {ayuda && <Text style={styles.ayuda}>{ayuda}</Text>}
+    </View>
+  );
+}
+
+/** Campo de contraseña con un botón para mostrarla u ocultarla (ACC-02). */
+export function CampoPassword({
+  etiqueta,
+  ayuda,
+  ...props
+}: { etiqueta: string; ayuda?: string } & TextInputProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <View style={styles.campo}>
+      <Text style={styles.etiqueta}>{etiqueta}</Text>
+      <View style={styles.filaPassword}>
+        <TextInput
+          style={[styles.input, styles.inputPassword]}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          accessibilityLabel={etiqueta}
+          {...props}
+          secureTextEntry={!visible}
+        />
+        <Pressable
+          style={styles.ojo}
+          onPress={() => setVisible((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={visible ? 'eye-off-outline' : 'eye-outline'}
+            size={22}
+            color={colors.textMuted}
+          />
+        </Pressable>
+      </View>
       {ayuda && <Text style={styles.ayuda}>{ayuda}</Text>}
     </View>
   );
@@ -120,6 +161,9 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   ayuda: { fontSize: 12, color: colors.textMuted },
+  filaPassword: { justifyContent: 'center' },
+  inputPassword: { paddingRight: 46 },
+  ojo: { position: 'absolute', right: 12 },
   opciones: { gap: 8 },
   opcion: {
     backgroundColor: colors.surface,

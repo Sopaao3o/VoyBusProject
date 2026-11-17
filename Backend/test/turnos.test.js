@@ -6,6 +6,7 @@ const { createDatabase } = require('../src/config/database');
 const { createMigrator } = require('../src/database/migrator');
 const { initModels } = require('../src/database/models');
 const { cargarDatosEjemplo } = require('../src/database/seeders/datos-ejemplo');
+const { tokenPara } = require('./auth-helpers');
 
 let server, base, sequelize, models;
 
@@ -27,11 +28,32 @@ test.after(async () => {
 const call = async (method, path, body) => {
   const res = await fetch(base + path, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tokenPara(1)}`, // administrador de ejemplo
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: res.status, body: await res.json() };
 };
+
+test('Las rutas de administración exigen un JWT de administrador', async () => {
+  const sinToken = await fetch(base + '/turnos');
+  assert.equal(sinToken.status, 401);
+  assert.equal((await sinToken.json()).error.code, 'NO_AUTENTICADO');
+
+  const malFormado = await fetch(base + '/turnos', {
+    headers: { Authorization: 'Basic abc' },
+  });
+  assert.equal(malFormado.status, 401);
+  assert.equal((await malFormado.json()).error.code, 'NO_AUTENTICADO');
+
+  const pasajero = await fetch(base + '/turnos', {
+    headers: { Authorization: `Bearer ${tokenPara(5)}` },
+  });
+  assert.equal(pasajero.status, 403);
+  assert.equal((await pasajero.json()).error.code, 'SIN_PERMISO');
+});
 
 // Turno de ejemplo: día 10 de diciembre, con dos viajes
 const dia = (d, hora) => `2026-12-${String(d).padStart(2, '0')}T${hora}:00Z`;

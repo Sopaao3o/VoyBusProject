@@ -23,6 +23,6 @@ class HttpError extends Error {
 
 const badRequest = (msg, extra) => new HttpError(400, msg, extra); // datos inválidos
 const notFound = (msg) => new HttpError(404, msg); // no existe
-const conflict = (msg) => new HttpError(409, msg); // choca con otra cosa (p. ej. horarios)
+const conflict = (msg, extra) => new HttpError(409, msg, extra); // choca con otra cosa (p. ej. horarios)
 
 module.exports = { HttpError, badRequest, notFound, conflict };

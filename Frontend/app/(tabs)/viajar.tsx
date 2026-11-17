@@ -14,7 +14,7 @@ import { colors } from '../../src/theme/colors';
 export default function ViajarScreen() {
   const router = useRouter();
   const { usuario } = useUsuario();
-  const { datos, cargando, error, recargar } = useApi(viajesEnCurso, [usuario.id]);
+  const { datos, cargando, error, recargar } = useApi(viajesEnCurso, [usuario?.id ?? null]);
 
   useFocusEffect(
     useCallback(() => {
@@ -22,7 +22,7 @@ export default function ViajarScreen() {
     }, [recargar]),
   );
 
-  if (usuario.rol !== 'pasajero') {
+  if (usuario?.rol !== 'pasajero') {
     return <ErrorMensaje mensaje="Esta sección es solo para pasajeros." />;
   }
   if (cargando && !datos) return <Cargando />;

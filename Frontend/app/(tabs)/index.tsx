@@ -40,7 +40,14 @@ export default function LineasScreen() {
             >
               <View style={styles.fila}>
                 <InsigniaLinea linea={item} />
-                <Text style={styles.nombre}>{item.nombre}</Text>
+                <View style={styles.textos}>
+                  <Text style={styles.nombre}>{item.nombre}</Text>
+                  {item.punto_inicio && item.punto_termino && (
+                    <Text style={styles.extremos}>
+                      {item.punto_inicio} → {item.punto_termino}
+                    </Text>
+                  )}
+                </View>
               </View>
               {item.aviso && <Aviso texto={item.aviso} />}
             </Pressable>
@@ -63,5 +70,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  nombre: { flex: 1, fontSize: 16, color: colors.text, fontWeight: '500' },
+  textos: { flex: 1, gap: 2 },
+  nombre: { fontSize: 16, color: colors.text, fontWeight: '500' },
+  extremos: { fontSize: 13, color: colors.textMuted },
 });

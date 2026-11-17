@@ -6,9 +6,9 @@ import { colors } from '../../src/theme/colors';
 
 export default function TabsLayout() {
   const { usuario } = useUsuario();
-  const esAdmin = usuario.rol === 'administrador';
-  const esConductor = usuario.rol === 'conductor';
-  const esPasajero = usuario.rol === 'pasajero';
+  const esAdmin = usuario?.rol === 'administrador';
+  const esConductor = usuario?.rol === 'conductor';
+  const esPasajero = usuario?.rol === 'pasajero';
 
   return (
     <Tabs
@@ -59,6 +59,17 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* VEH-03: incidencias y estado de los vehículos, solo para el administrador. */}
+      <Tabs.Screen
+        name="flota"
+        options={{
+          title: 'Flota',
+          href: esAdmin ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="construct-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
       {/* VEH-03: solo el conductor ve esta pestaña. */}
       <Tabs.Screen
         name="mis-turnos"
@@ -73,7 +84,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="usuario"
         options={{
-          title: 'Usuario',
+          title: 'Cuenta',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" color={color as string} size={size} />
           ),

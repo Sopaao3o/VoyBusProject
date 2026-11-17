@@ -58,16 +58,50 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
     }));
   }
 
+  /**
+   * Punto de inicio y de término de cada línea: el primer y el último paradero activo de su
+   * recorrido de ida. Devuelve un Map con el id de la línea como clave.
+   */
+  async function extremosDeLineas(lineaIds) {
+    const extremos = new Map();
+    if (lineaIds.length === 0) return extremos;
+    const paradas = await RecorridoParadero.findAll({
+      include: [
+        { model: Paradero, as: 'paradero', where: { activo: 1 } },
+        {
+          model: Recorrido,
+          as: 'recorrido',
+          where: { linea_id: lineaIds, sentido: 'ida', activo: 1 },
+        },
+      ],
+      order: [['orden', 'ASC']],
+    });
+    for (const p of paradas) {
+      const lineaId = p.recorrido.linea_id;
+      const actual = extremos.get(lineaId);
+      if (!actual) {
+        extremos.set(lineaId, {
+          punto_inicio: p.paradero.nombre,
+          punto_termino: p.paradero.nombre,
+        });
+      } else {
+        actual.punto_termino = p.paradero.nombre;
+      }
+    }
+    return extremos;
+  }
+
+  const SIN_EXTREMOS = { punto_inicio: null, punto_termino: null };
+
   return {
     async listarLineas(q) {
       const term = normalizar(q);
       const lineas = await Linea.findAll({ where: lineaVisible, order: [['codigo', 'ASC']] });
-      return lineas
-        .filter(
-          (l) =>
-            !term || normalizar(l.codigo).includes(term) || normalizar(l.nombre).includes(term),
-        )
-        .map(lineaPublica);
+      const visibles = lineas.filter(
+        (l) => !term || normalizar(l.codigo).includes(term) || normalizar(l.nombre).includes(term),
+      );
+      const extremos = await extremosDeLineas(visibles.map((l) => l.id));
+      return visibles.map((l) => ({ ...lineaPublica(l), ...(extremos.get(l.id) ?? SIN_EXTREMOS) }));
     },
 
     async obtenerLinea(id) {
@@ -77,7 +111,12 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
         where: { linea_id: id, activo: 1 },
         order: [['sentido', 'ASC']],
       });
-      return { ...lineaPublica(linea), recorridos: await recorridosConParadas(recorridos) };
+      const extremos = await extremosDeLineas([linea.id]);
+      return {
+        ...lineaPublica(linea),
+        ...(extremos.get(linea.id) ?? SIN_EXTREMOS),
+        recorridos: await recorridosConParadas(recorridos),
+      };
     },
 
     async obtenerRecorrido(id) {
@@ -129,13 +168,25 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
           },
         ],
       });
+      // Por cada línea que pasa por el paradero, en qué sentidos (recorridos) lo hace.
       const lineas = new Map();
-      for (const p of paradas) lineas.set(p.recorrido.linea.id, p.recorrido.linea);
+      for (const p of paradas) {
+        const { linea } = p.recorrido;
+        if (!lineas.has(linea.id)) lineas.set(linea.id, { linea, recorridos: [] });
+        lineas.get(linea.id).recorridos.push({ id: p.recorrido.id, sentido: p.recorrido.sentido });
+      }
       return {
         ...paraderoPublico(paradero),
         lineas: [...lineas.values()]
-          .sort((a, b) => a.codigo.localeCompare(b.codigo))
-          .map(lineaPublica),
+          .sort((a, b) => a.linea.codigo.localeCompare(b.linea.codigo))
+          .map(({ linea, recorridos }) => {
+            const ordenados = recorridos.sort((a, b) => a.sentido.localeCompare(b.sentido));
+            return {
+              ...lineaPublica(linea),
+              sentidos: ordenados.map((r) => r.sentido),
+              recorridos: ordenados,
+            };
+          }),
       };
     },
   };
