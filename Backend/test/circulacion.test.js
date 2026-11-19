@@ -86,6 +86,20 @@ async function viajeEnCurso({ conductor = 2, vehiculo = 1, recorrido = 1 } = {})
   return { viaje: viaje.id, turno: turno.id };
 }
 
+/** VIA-01: vincula al pasajero con el viaje (termina antes cualquier otra vinculación suya). */
+async function vincular(viajeId, pasajero = 5) {
+  const pasajeroId = typeof pasajero === 'number' ? pasajero : pasajero.id;
+  await models.Vinculacion.update(
+    { terminada_en: new Date().toISOString(), motivo_termino: 'desvinculado' },
+    { where: { pasajero_id: pasajeroId, terminada_en: null } },
+  );
+  await models.Vinculacion.create({
+    pasajero_id: pasajeroId,
+    viaje_id: viajeId,
+    creada_en: new Date().toISOString(),
+  });
+}
+
 const posicion = (viaje, punto, as = 2) =>
   call('POST', `/conductor/viajes/${viaje}/ubicacion`, { as, body: punto });
 
@@ -192,6 +206,7 @@ test('ADM-04: solo el administrador ve el monitoreo', async () => {
 test('ADM-04: conductor, turno, ubicación, solicitudes pendientes, estado e incidencias', async () => {
   const { viaje, turno } = await viajeEnCurso();
   await posicion(viaje, entre(PA001, PA003, 0.5));
+  await vincular(viaje);
   await call('POST', `/viajes/${viaje}/solicitudes-parada`, { as: 5, body: { paradero_id: 4 } });
   await call('POST', `/conductor/turnos/${turno}/incidencias`, {
     as: 2,

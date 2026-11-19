@@ -51,6 +51,7 @@ Backend/
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
 │   │   ├── ubicacion/          # VEH-01 GPS, RED-03 vehículos, ADM-04 monitoreo, simulador de flota
+│   │   ├── vinculacion/        # VIA-01
 │   │   └── viajes/             # VIA-02 y simulador
 │   ├── routes/health.routes.js
 │   └── utils/httpErrors.js
@@ -412,7 +413,23 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 | `GET /api/v1/admin/incidencias`                       | (administrador) Incidencias registradas por los conductores.    |
 | `GET /api/v1/admin/vehiculos/:id/historial`           | (administrador) Historial de estados de un vehículo.            |
 
-### Solicitud de parada (VIA-02) · pasajero
+### Vinculación con un vehículo (VIA-01) · pasajero (registrado o invitado)
+
+| Método y ruta                               | Descripción                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /api/v1/vinculacion/vehiculos/:codigo` | Consulta la micro antes de confirmar: vehículo, línea, sentido, destino. |
+| `POST /api/v1/vinculacion`                  | Vincula. Body: `{ "codigo": "BUS-01" }` (o el texto del QR).             |
+| `GET /api/v1/vinculacion`                   | Mi vinculación activa, o `null`.                                         |
+| `DELETE /api/v1/vinculacion`                | Me desvinculo; cierra mi solicitud de parada pendiente de ese viaje.     |
+
+- El código es el identificador del vehículo; el QR contiene `voybus://vehiculo/BUS-01`. Se
+  acepta cualquiera de las dos formas, sin importar mayúsculas.
+- Código inexistente → 404; vehículo sin viaje en curso → 409. En ambos casos no se vincula.
+- Una sola vinculación activa por pasajero (índice único en la base): para cambiar de micro hay
+  que desvincularse primero (409 si no).
+- Termina sola cuando el conductor finaliza el viaje.
+
+### Solicitud de parada (VIA-02) · pasajero vinculado al viaje
 
 | Método y ruta                                   | Descripción                                                             |
 | ----------------------------------------------- | ----------------------------------------------------------------------- |
@@ -420,8 +437,10 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 | `POST /api/v1/viajes/:id/solicitudes-parada`    | Solicita parada. Body: `{ "paradero_id": 3 }`. Una pendiente por viaje. |
 | `GET /api/v1/viajes/:id/solicitudes-parada/mia` | Mi solicitud y su estado.                                               |
 
+Sin vinculación activa con ese viaje, responden 403 con código `NO_VINCULADO`.
+
 Estados de una solicitud: `enviada` → `proxima` (es el siguiente paradero) → `cerrada`
-(motivo `paradero_superado` o `viaje_finalizado`). Cambian solos con cada posición del GPS.
+(motivo `paradero_superado`, `viaje_finalizado` o `pasajero_desvinculado`). Cambian solos con cada posición del GPS.
 
 ### Ubicación del vehículo (VEH-01) · conductor
 
@@ -490,4 +509,4 @@ quedado de una simulación anterior.
 
 ## Pendiente
 
-- Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.
+- VEH-02 (aviso de parada con sonido para el conductor) y ADM-01 (gestión de la red).

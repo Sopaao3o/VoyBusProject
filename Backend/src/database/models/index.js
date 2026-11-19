@@ -14,6 +14,7 @@ const definirSolicitudParada = require('./solicitud-parada');
 const definirUbicacionVehiculo = require('./ubicacion-vehiculo');
 const definirTokenRevocado = require('./token-revocado');
 const definirFavorito = require('./favorito');
+const definirVinculacion = require('./vinculacion');
 
 /** @param {import('sequelize').Sequelize} sequelize */
 function initModels(sequelize) {
@@ -32,6 +33,7 @@ function initModels(sequelize) {
   const UbicacionVehiculo = definirUbicacionVehiculo(sequelize);
   const TokenRevocado = definirTokenRevocado(sequelize);
   const Favorito = definirFavorito(sequelize);
+  const Vinculacion = definirVinculacion(sequelize);
 
   // Una línea tiene recorridos (ida y vuelta)
   Linea.hasMany(Recorrido, { foreignKey: 'linea_id', as: 'recorridos' });
@@ -70,6 +72,10 @@ function initModels(sequelize) {
   Favorito.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
   Favorito.belongsTo(Paradero, { foreignKey: 'paradero_id', as: 'paradero' });
 
+  // VIA-01: el pasajero vinculado al viaje del vehículo en que va
+  Vinculacion.belongsTo(Viaje, { foreignKey: 'viaje_id', as: 'viaje' });
+  Vinculacion.belongsTo(Usuario, { foreignKey: 'pasajero_id', as: 'pasajero' });
+
   return {
     sequelize,
     Usuario,
@@ -87,6 +93,7 @@ function initModels(sequelize) {
     UbicacionVehiculo,
     TokenRevocado,
     Favorito,
+    Vinculacion,
   };
 }
 

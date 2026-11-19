@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const { notFound, conflict, HttpError } = require('../../utils/httpErrors');
 const { turnoCompleto } = require('../turnos/turno-detalle');
 const { evaluar } = require('./evaluacion');
+const { terminarVinculacionesDelViaje } = require('../vinculacion/terminar');
 
 /**
  * Ojo con las transacciones: con una sola conexión SQLite, toda consulta que se haga
@@ -220,6 +221,8 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
           { estado: 'cerrada', motivo_cierre: 'viaje_finalizado', cerrada_en: ahoraISO() },
           { where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } }, transaction },
         );
+        // VIA-01: los pasajeros quedan desvinculados del vehículo.
+        await terminarVinculacionesDelViaje(models, viajeId, ahoraISO, transaction);
         return detalle(turno.id, transaction);
       });
     },

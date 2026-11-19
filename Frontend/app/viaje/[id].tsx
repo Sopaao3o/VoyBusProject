@@ -1,11 +1,12 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { textoDeError } from '../../src/api/client';
+import { ApiError, textoDeError } from '../../src/api/client';
 import type { SolicitudParada } from '../../src/api/tipos';
 import { avanzarVehiculo, paraderosDisponibles, solicitarParada } from '../../src/api/viajes';
-import { Cargando, ErrorMensaje } from '../../src/components/Estados';
+import { desvincularme } from '../../src/api/vinculacion';
+import { Cargando, ErrorMensaje, Vacio } from '../../src/components/Estados';
 import { Boton } from '../../src/components/Formulario';
 import { useApi } from '../../src/hooks/useApi';
 import { colors } from '../../src/theme/colors';
@@ -25,13 +26,25 @@ function presentar(s: SolicitudParada) {
 }
 
 // VIA-02: elegir el destino entre los paraderos que faltan y enviar la solicitud de parada.
+// VIA-01: solo con la vinculación activa; el pasajero puede bajarse (desvincularse) aquí.
 export default function ViajeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const viajeId = Number(id);
-  const { datos, cargando, error, recargar } = useApi(
-    () => paraderosDisponibles(viajeId),
-    [viajeId],
-  );
+  const router = useRouter();
+  // Se guarda el error con su código para distinguir "no vinculado" o "viaje terminado".
+  const [motivo, setMotivo] = useState<'no_vinculado' | 'terminado' | null>(null);
+  const { datos, cargando, error, recargar } = useApi(async () => {
+    try {
+      const r = await paraderosDisponibles(viajeId);
+      setMotivo(null);
+      return r;
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'NO_VINCULADO') setMotivo('no_vinculado');
+      else if (e instanceof ApiError && e.status === 409) setMotivo('terminado');
+      throw e;
+    }
+  }, [viajeId]);
+  const [bajando, setBajando] = useState(false);
   const [elegido, setElegido] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -41,6 +54,22 @@ export default function ViajeScreen() {
     return () => clearInterval(t);
   }, [recargar]);
 
+  if (motivo === 'terminado') {
+    return (
+      <View style={styles.fin}>
+        <Vacio mensaje="Este viaje terminó y tu vinculación con la micro también." />
+        <Boton titulo="Volver al mapa" onPress={() => router.dismissTo('/')} />
+      </View>
+    );
+  }
+  if (motivo === 'no_vinculado') {
+    return (
+      <View style={styles.fin}>
+        <Vacio mensaje="Ya no estás vinculado a esta micro. Escanea su código para volver a vincularte." />
+        <Boton titulo="Subir a una micro" onPress={() => router.replace('/viajar')} />
+      </View>
+    );
+  }
   if (cargando && !datos) return <Cargando />;
   if (error && !datos) return <ErrorMensaje mensaje={error} onReintentar={recargar} />;
   if (!datos) return null;
@@ -63,6 +92,33 @@ export default function ViajeScreen() {
     } finally {
       setEnviando(false);
     }
+  }
+
+  function bajarme() {
+    Alert.alert(
+      'Bajarme de esta micro',
+      abierta
+        ? 'Tu solicitud de parada se cancelará y el conductor ya no la verá.'
+        : 'Dejarás de estar vinculado a esta micro.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Bajarme',
+          style: 'destructive',
+          onPress: async () => {
+            setBajando(true);
+            try {
+              await desvincularme();
+              router.dismissTo('/');
+            } catch (e) {
+              Alert.alert('No se pudo completar', textoDeError(e));
+            } finally {
+              setBajando(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function avanzar() {
@@ -139,19 +195,29 @@ export default function ViajeScreen() {
         />
       )}
 
-      <View style={styles.simulador}>
-        <Text style={styles.simuladorTitulo}>Simulador (solo desarrollo)</Text>
-        <Text style={styles.dato}>
-          Avanza el vehículo hasta el siguiente paradero, como lo haría el GPS del conductor.
-        </Text>
-        <Boton titulo="Avanzar el vehículo" variante="secundario" onPress={avanzar} />
-      </View>
+      <Boton
+        titulo={bajando ? 'Bajando…' : 'Bajarme de esta micro'}
+        variante="secundario"
+        onPress={bajarme}
+        deshabilitado={bajando}
+      />
+
+      {__DEV__ && (
+        <View style={styles.simulador}>
+          <Text style={styles.simuladorTitulo}>Simulador (solo desarrollo)</Text>
+          <Text style={styles.dato}>
+            Adelanta la micro hasta el siguiente paradero, sin esperar al GPS del conductor.
+          </Text>
+          <Boton titulo="Avanzar el vehículo" variante="secundario" onPress={avanzar} />
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   contenido: { padding: 16, gap: 12, paddingBottom: 40 },
+  fin: { flex: 1, padding: 24, justifyContent: 'center', gap: 12 },
   tarjeta: {
     backgroundColor: colors.surface,
     borderColor: colors.border,

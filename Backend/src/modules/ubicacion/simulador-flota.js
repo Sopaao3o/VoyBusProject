@@ -5,6 +5,7 @@
 // contraseña: no se puede iniciar sesión con ellos.
 const { Op } = require('sequelize');
 const { puntoEnRecorrido, distanciasAcumuladas } = require('./geo');
+const { terminarVinculacionesDelViaje } = require('../vinculacion/terminar');
 
 const INTERVALO_MS = 5000;
 
@@ -107,6 +108,7 @@ function createSimuladorFlota(models, ubicacion, { ahora = () => new Date() } = 
         { estado: 'cerrada', motivo_cierre: 'viaje_finalizado', cerrada_en: ahoraISO() },
         { where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } }, transaction },
       );
+      await terminarVinculacionesDelViaje(models, viajeId, ahoraISO, transaction);
     });
   }
 

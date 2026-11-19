@@ -83,6 +83,11 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   micro ve conductor, turno, ubicación, solicitudes pendientes, estado e incidencias.
 - **Simulador de flota (solo desarrollo):** desde el monitoreo se pueden poner en ruta BUS-02 a
   BUS-05 (o con `SIMULAR_FLOTA=1` en el backend), para ver el mapa con varias micros.
+- **Subir a una micro (VIA-01):** se escanea el QR de la micro con la cámara (`expo-camera`) o se
+  escribe su código (`BUS-01`), se ve la línea y el sentido y se confirma. Solo se puede ir en
+  una micro a la vez; el botón del inicio pasa a "Ver mi viaje". En el viaje está **Bajarme de
+  esta micro**. El administrador ve el QR de cada micro en Flota → vehículo, para imprimirlo. En
+  desarrollo, la pantalla ofrece los códigos de las micros en ruta (útil en el emulador).
 - Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
   aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
@@ -98,7 +103,7 @@ Frontend/
 │   ├── (tabs)/                 # mapa de inicio y pestañas de trabajo: turnos, flota, mis-turnos
 │   ├── cuenta.tsx              # ACC-03: tu cuenta, seguridad y cierre de sesión
 │   ├── terminos.tsx            # ACC-01: términos de uso y política de privacidad (borrador)
-│   ├── viajar.tsx              # VIA-02: elegir la micro en la que vas (lista provisoria)
+│   ├── viajar.tsx              # VIA-01: subir a una micro (QR o código)
 │   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde) y Google
 │   ├── google.tsx              # ACC-01/02: retorno desde Google (solo se cierra)
 │   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
@@ -133,7 +138,8 @@ Frontend/
 | ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                                                                                          |
 | RED-01    | Mapa de inicio (lista de líneas) y detalle con el recorrido en el mapa, sentido, días y horarios                                                             |
 | RED-02    | Paraderos en el mapa y en el panel (con favoritos); detalle: líneas, sentidos y favorito                                                                     |
-| VIA-02    | Subir a una micro: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                         |
+| VIA-01    | Subir a una micro: escanear el QR o escribir el código, confirmar y bajarse                                                                                  |
+| VIA-02    | Mi viaje: elegir destino (nombre, código y orden) y solicitar parada                                                                                         |
 | VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
 | RED-03    | Micros en vivo en el inicio, la línea (solo las de esa línea) y el paradero (las que se acercan)                                                             |
 | ADM-04    | Monitoreo del administrador: mapa con las micros y detalle de cada una                                                                                       |
@@ -142,5 +148,4 @@ Frontend/
 
 ## Pendiente
 
-- Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de Subir a una micro.
 - El recorrido se dibuja con líneas rectas entre paraderos, no por las calles.

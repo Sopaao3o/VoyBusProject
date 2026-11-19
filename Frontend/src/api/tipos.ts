@@ -168,15 +168,6 @@ export interface GrupoSolicitudes {
 
 // ───── VIA-02: pasajero ─────
 
-export interface ViajeEnCurso {
-  id: number;
-  linea_codigo: string;
-  linea_nombre: string;
-  sentido: 'ida' | 'vuelta';
-  vehiculo_identificador: string;
-  ultimo_orden_superado: number;
-}
-
 export type EstadoSolicitud = 'enviada' | 'proxima' | 'cerrada';
 
 export interface SolicitudParada {
@@ -412,4 +403,20 @@ export interface Monitoreo {
 export interface EstadoFlotaSimulada {
   activa: boolean;
   vehiculos: { identificador: string; linea: string; viaje_id: number; avance: number }[];
+}
+
+// ───── VIA-01: vinculación con un vehículo ─────
+
+/** La micro con su viaje en curso, tal como se muestra para confirmar. */
+export interface MicroParaVincular {
+  viaje_id: number;
+  vehiculo: { id: number; identificador: string };
+  linea: { id: number; codigo: string; nombre: string; color: string };
+  recorrido: { id: number; sentido: Sentido };
+  destino: string | null;
+}
+
+export interface Vinculacion extends MicroParaVincular {
+  id: number;
+  creada_en: string;
 }

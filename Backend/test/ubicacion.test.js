@@ -76,6 +76,20 @@ async function viajeEnCurso({ conductor = 2, estado = 'en_curso' } = {}) {
   return viaje.id;
 }
 
+/** VIA-01: vincula al pasajero con el viaje (termina antes cualquier otra vinculación suya). */
+async function vincular(viajeId, pasajero = 5) {
+  const pasajeroId = typeof pasajero === 'number' ? pasajero : pasajero.id;
+  await models.Vinculacion.update(
+    { terminada_en: new Date().toISOString(), motivo_termino: 'desvinculado' },
+    { where: { pasajero_id: pasajeroId, terminada_en: null } },
+  );
+  await models.Vinculacion.create({
+    pasajero_id: pasajeroId,
+    viaje_id: viajeId,
+    creada_en: new Date().toISOString(),
+  });
+}
+
 const enviar = (viaje, punto, extra = {}, as = 2) =>
   call('POST', `/conductor/viajes/${viaje}/ubicacion`, { as, body: { ...punto, ...extra } });
 
@@ -173,6 +187,7 @@ test('VEH-01: avisa cuando el vehículo está fuera del recorrido', async () => 
 
 test('VIA-03: con el GPS, la solicitud pasa sola de enviada a próxima y a cerrada', async () => {
   const v = await viajeEnCurso();
+  await vincular(v);
   const pedida = await call('POST', `/viajes/${v}/solicitudes-parada`, {
     as: 5,
     body: { paradero_id: 4 }, // PA-004, tercer paradero

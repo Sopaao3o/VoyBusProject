@@ -42,6 +42,9 @@ const {
 } = require('./modules/ubicacion/ubicacion.routes');
 const { createCirculacionService } = require('./modules/ubicacion/circulacion.service');
 const { createSimuladorFlota } = require('./modules/ubicacion/simulador-flota');
+const { createVinculacionService } = require('./modules/vinculacion/vinculacion.service');
+const { createVinculacionController } = require('./modules/vinculacion/vinculacion.controller');
+const { createVinculacionRoutes } = require('./modules/vinculacion/vinculacion.routes');
 
 /**
  * @param {object} deps
@@ -104,6 +107,13 @@ function createApp({
   v1.use('/admin', autenticar, createMonitoreoRoutes(circulacion));
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
+  v1.use(
+    '/vinculacion',
+    autenticar,
+    createVinculacionRoutes(
+      createVinculacionController(createVinculacionService(models, { ahora })),
+    ),
+  );
   if (simulador) {
     v1.use('/simulador', createSimuladorRoutes(viajes));
     flota ??= createSimuladorFlota(models, ubicacion, { ahora });

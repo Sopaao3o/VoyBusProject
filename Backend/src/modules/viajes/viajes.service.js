@@ -6,6 +6,7 @@ const { actualizarSolicitudes } = require('./solicitudes');
 const TEXTO_CIERRE = {
   paradero_superado: 'El vehículo ya superó tu paradero',
   viaje_finalizado: 'El viaje finalizó',
+  pasajero_desvinculado: 'Te desvinculaste del vehículo',
 };
 
 /**
@@ -25,17 +26,31 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     RecorridoParadero,
     SolicitudParada,
     UbicacionVehiculo,
+    Vinculacion,
   } = models;
   const ahoraISO = () => ahora().toISOString();
   const abierta = { [Op.ne]: 'cerrada' };
 
-  // TODO(VIA-01): cuando exista la vinculación del pasajero con un viaje, comprobar aquí
-  // que el pasajero está vinculado a este viaje.
   async function exigirPasajero(id, transaction) {
     const u = await Usuario.findByPk(id, { transaction });
     if (!u || u.rol !== 'pasajero') throw new HttpError(403, 'Esta acción es solo para pasajeros');
     if (u.estado !== 'habilitado') throw new HttpError(403, 'Tu cuenta no está habilitada');
     return u;
+  }
+
+  /** VIA-01: solo quien está vinculado a un viaje puede elegir destino y pedir parada en él. */
+  async function exigirVinculado(pasajeroId, viajeId, transaction) {
+    const v = await Vinculacion.findOne({
+      where: { pasajero_id: pasajeroId, viaje_id: viajeId, terminada_en: { [Op.is]: null } },
+      transaction,
+    });
+    if (!v) {
+      throw new HttpError(
+        403,
+        'Primero vincúlate a esta micro escaneando su código QR o escribiendo su código',
+        { code: 'NO_VINCULADO' },
+      );
+    }
   }
 
   /** El viaje, solo si está en curso (404 si no existe, 409 si no está en curso). */
@@ -91,6 +106,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirPasajero(pasajeroId, transaction);
         const viaje = await viajeEnCurso(viajeId, transaction);
+        await exigirVinculado(pasajeroId, viaje.id, transaction);
         const paradas = await RecorridoParadero.findAll({
           where: {
             recorrido_id: viaje.recorrido_id,
@@ -121,6 +137,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         return await sequelize.transaction(async (transaction) => {
           await exigirPasajero(pasajeroId, transaction);
           const viaje = await viajeEnCurso(viajeId, transaction);
+          await exigirVinculado(pasajeroId, viaje.id, transaction);
           const parada = await RecorridoParadero.findOne({
             where: { recorrido_id: viaje.recorrido_id, paradero_id: paraderoId },
             include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
@@ -167,8 +184,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     },
 
     /**
-     * SIMULADOR (solo desarrollo): viajes en curso, para elegir uno mientras no exista
-     * la vinculación del pasajero por QR (VIA-01).
+     * SIMULADOR (solo desarrollo): viajes en curso, para pruebas.
      */
     async viajesEnCurso() {
       const viajes = await Viaje.findAll({

@@ -11,6 +11,7 @@ import {
   vehiculosEnCirculacion,
 } from '../../src/api/circulacion';
 import { listarLineas, listarParaderos } from '../../src/api/red';
+import { miVinculacion } from '../../src/api/vinculacion';
 import type { MicroProxima, VehiculoCirculacion } from '../../src/api/tipos';
 import { Cargando, ErrorMensaje, Vacio } from '../../src/components/Estados';
 import { BotonFlotante } from '../../src/components/mapa/BotonFlotante';
@@ -87,6 +88,20 @@ function InicioMapa() {
     [latitud, longitud],
   );
   const cercano = cercanos.datos?.[0] ?? null;
+  // VIA-01: si el pasajero ya va en una micro, el botón principal lleva a su viaje.
+  const esPasajero = usuario?.rol === 'pasajero';
+  const vinculacion = useApi(
+    () => (esPasajero ? miVinculacion() : Promise.resolve(null)),
+    [usuario?.id ?? null],
+  );
+  const recargarVinculacion = vinculacion.recargar;
+  useFocusEffect(
+    useCallback(() => {
+      void recargarVinculacion();
+    }, [recargarVinculacion]),
+  );
+  const miViaje = vinculacion.datos ?? null;
+
   const proximas = useEnVivo(
     () => (cercano ? microsProximas(cercano.id) : Promise.resolve([] as MicroProxima[])),
     [cercano?.id ?? null],
@@ -263,12 +278,24 @@ function InicioMapa() {
             )}
             {!esPersonal && (
               <Pressable
-                style={({ pressed }) => [styles.subir, pressed && styles.subirPresionado]}
-                onPress={() => router.push('/viajar')}
+                style={({ pressed }) => [
+                  styles.subir,
+                  miViaje && styles.subirEnViaje,
+                  pressed && styles.subirPresionado,
+                ]}
+                onPress={() => router.push(miViaje ? `/viaje/${miViaje.viaje_id}` : '/viajar')}
                 accessibilityRole="button"
               >
-                <Ionicons name="bus" size={20} color={colors.surface} />
-                <Text style={styles.subirTexto}>Subir a una micro</Text>
+                <Ionicons
+                  name={miViaje ? 'navigate' : 'qr-code'}
+                  size={20}
+                  color={colors.surface}
+                />
+                <Text style={styles.subirTexto}>
+                  {miViaje
+                    ? `Ver mi viaje · ${miViaje.linea.codigo} ${miViaje.vehiculo.identificador}`
+                    : 'Subir a una micro'}
+                </Text>
               </Pressable>
             )}
             <View style={styles.buscador}>
@@ -365,6 +392,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.text,
   },
   subirPresionado: { opacity: 0.85 },
+  subirEnViaje: { backgroundColor: colors.primary },
   subirTexto: { color: colors.surface, fontSize: 16, fontWeight: '700' },
   lista: { paddingHorizontal: 16, paddingBottom: 16 },
 });
