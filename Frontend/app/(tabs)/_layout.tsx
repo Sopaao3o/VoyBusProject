@@ -4,11 +4,13 @@ import { Tabs } from 'expo-router';
 import { useUsuario } from '../../src/session/UsuarioContext';
 import { colors } from '../../src/theme/colors';
 
+// El mapa es la pantalla principal. Pasajeros, invitados y personas sin sesión solo ven el mapa
+// (sin barra de pestañas); el administrador y el conductor tienen además sus pestañas de trabajo.
 export default function TabsLayout() {
   const { usuario } = useUsuario();
   const esAdmin = usuario?.rol === 'administrador';
   const esConductor = usuario?.rol === 'conductor';
-  const esPasajero = usuario?.rol === 'pasajero';
+  const conPestanas = esAdmin || esConductor;
 
   return (
     <Tabs
@@ -17,34 +19,16 @@ export default function TabsLayout() {
         headerTintColor: colors.surface,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: conPestanas ? undefined : { display: 'none' },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Líneas',
+          title: 'Mapa',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bus-outline" color={color as string} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="paraderos"
-        options={{
-          title: 'Paraderos',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="location-outline" color={color as string} size={size} />
-          ),
-        }}
-      />
-      {/* VIA-02: solo el pasajero ve esta pestaña. */}
-      <Tabs.Screen
-        name="viajar"
-        options={{
-          title: 'Viajar',
-          href: esPasajero ? undefined : null,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="navigate-outline" color={color as string} size={size} />
+            <Ionicons name="map-outline" color={color as string} size={size} />
           ),
         }}
       />
@@ -78,15 +62,6 @@ export default function TabsLayout() {
           href: esConductor ? undefined : null,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="clipboard-outline" color={color as string} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="usuario"
-        options={{
-          title: 'Cuenta',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color as string} size={size} />
           ),
         }}
       />

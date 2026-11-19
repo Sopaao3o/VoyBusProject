@@ -45,17 +45,19 @@ Funciona sin servicios de pago: se prueba con **Expo Go** y el backend local.
 
 ## Sesión y cuentas
 
-Las líneas y los paraderos se consultan sin cuenta. Lo demás exige iniciar sesión en la pestaña
-**Cuenta**; la app envía el JWT en el encabezado `Authorization: Bearer <token>`.
+La pantalla principal es un **mapa** con los paraderos y un panel deslizable para buscar líneas y
+paraderos; se usa sin cuenta. El botón redondo de arriba a la izquierda abre **Tu cuenta** (iniciar
+sesión, crear cuenta, seguridad). La app envía el JWT en el encabezado
+`Authorization: Bearer <token>`.
 
 Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña `Clave123!`:
 
-| Rol           | Correo                   | Pestañas que ve                          |
-| ------------- | ------------------------ | ---------------------------------------- |
-| Pasajero      | `ana.pasajera@voybus.cl` | Líneas, Paraderos, Viajar, Cuenta        |
-| Conductor     | `carlos.rojas@voybus.cl` | Líneas, Paraderos, Mis turnos, Cuenta    |
-| Conductor     | `maria.soto@voybus.cl`   | Líneas, Paraderos, Mis turnos, Cuenta    |
-| Administrador | `admin@voybus.cl`        | Líneas, Paraderos, Turnos, Flota, Cuenta |
+| Rol           | Correo                   | Qué ve                                                |
+| ------------- | ------------------------ | ----------------------------------------------------- |
+| Pasajero      | `ana.pasajera@voybus.cl` | Mapa sin pestañas, con el botón **Subir a una micro** |
+| Conductor     | `carlos.rojas@voybus.cl` | Pestañas Mapa y Mis turnos                            |
+| Conductor     | `maria.soto@voybus.cl`   | Pestañas Mapa y Mis turnos                            |
+| Administrador | `admin@voybus.cl`        | Pestañas Mapa, Turnos y Flota                         |
 
 - La sesión se guarda cifrada en el teléfono (`expo-secure-store`): al reabrir la app sigue
   iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
@@ -63,6 +65,10 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   el código del enlace de recuperación llegan en la respuesta y la app los muestra.
 - **Continuar con Google** (en Iniciar sesión y en Crear cuenta) abre el navegador del teléfono y
   vuelve a la app. Necesita que el backend tenga Google configurado (ver `Backend/README.md`).
+- El mapa usa `react-native-maps`, que funciona en Expo Go sin clave: Google Maps en Android y
+  Apple Maps en iOS. El botón de ubicación pide permiso recién al tocarlo (`expo-location`).
+- Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
+  aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
   La app muestra el código QR, y también permite abrir la aplicación instalada en el mismo
   teléfono o copiar la clave a mano.
@@ -73,7 +79,10 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
 Frontend/
 ├── app/                        # pantallas (Expo Router: cada archivo es una ruta)
 │   ├── _layout.tsx             # navegación principal y sesión
-│   ├── (tabs)/                 # pestañas: líneas, paraderos, turnos, flota, mis-turnos, viajar, usuario
+│   ├── (tabs)/                 # mapa de inicio y pestañas de trabajo: turnos, flota, mis-turnos
+│   ├── cuenta.tsx              # ACC-03: tu cuenta, seguridad y cierre de sesión
+│   ├── terminos.tsx            # ACC-01: términos de uso y política de privacidad (borrador)
+│   ├── viajar.tsx              # VIA-02: elegir la micro en la que vas (lista provisoria)
 │   ├── login.tsx               # ACC-02: iniciar sesión (con código 2FA si corresponde) y Google
 │   ├── google.tsx              # ACC-01/02: retorno desde Google (solo se cierra)
 │   ├── registro.tsx            # ACC-01: crear cuenta de pasajero
@@ -81,8 +90,8 @@ Frontend/
 │   ├── dos-factores.tsx        # ACC-01: activar o desactivar la verificación en dos pasos
 │   ├── recuperar.tsx           # ACC-04: recuperar la contraseña
 │   ├── cambiar-password.tsx    # ACC-04: cambiar la contraseña
-│   ├── linea/[id].tsx          # RED-01: línea con recorridos
-│   ├── paradero/[id].tsx       # RED-02: paradero con sus líneas
+│   ├── linea/[id].tsx          # RED-01: recorrido de la línea dibujado en el mapa
+│   ├── paradero/[id].tsx       # RED-02: paradero en el mapa con sus líneas
 │   ├── turno/                  # ADM-03: detalle y formulario de turnos
 │   ├── conductor/              # VEH-03: turno del conductor y solicitudes de parada
 │   ├── vehiculo/[id].tsx       # VEH-03: historial de estados e incidencias (administrador)
@@ -90,7 +99,8 @@ Frontend/
 ├── src/
 │   ├── api/                    # cliente de la API y una función por consulta
 │   ├── components/             # piezas reutilizables (formularios, estados, etiquetas)
-│   ├── hooks/                  # useApi, useBusqueda, useRecorridos, useFavoritos
+│   │   └── mapa/               # mapa, marcadores, panel deslizable y botones flotantes
+│   ├── hooks/                  # useApi, useBusqueda, useFavoritos, useMiUbicacion, usePantallaMapa...
 │   ├── session/                # sesión
 │   ├── theme/colors.ts         # paleta de VoyBus
 │   └── utils/                  # fechas y textos
@@ -103,15 +113,16 @@ Frontend/
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ACC-01    | Crear cuenta con correo, teléfono o Google; verificar código, invitado y verificación en dos pasos                                                           |
 | ACC-02    | Iniciar sesión con correo, teléfono o Google, con código 2FA si la cuenta lo tiene                                                                           |
-| ACC-03    | Pestaña Cuenta: cerrar sesión                                                                                                                                |
+| ACC-03    | Tu cuenta: cerrar sesión                                                                                                                                     |
 | ACC-04    | Recuperar la contraseña y cambiarla desde la cuenta                                                                                                          |
-| RED-01    | Pestaña Líneas (inicio y término) y detalle con selector de sentido, días, horarios y paraderos                                                              |
-| RED-02    | Pestaña Paraderos (con favoritos) y detalle: líneas que pasan, sentidos y favorito                                                                           |
-| VIA-02    | Pestaña Viajar: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                            |
+| RED-01    | Mapa de inicio (lista de líneas) y detalle con el recorrido en el mapa, sentido, días y horarios                                                             |
+| RED-02    | Paraderos en el mapa y en el panel (con favoritos); detalle: líneas, sentidos y favorito                                                                     |
+| VIA-02    | Subir a una micro: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                         |
 | VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
 | ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente
 
-- Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de la pestaña Viajar.
-- Mapa con la ubicación de los vehículos.
+- Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de Subir a una micro.
+- Ubicación de los vehículos en el mapa (VEH-01 y RED-03). Por ahora el recorrido se dibuja con
+  líneas rectas entre paraderos, no por las calles.

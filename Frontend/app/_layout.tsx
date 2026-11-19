@@ -13,8 +13,9 @@ const PANTALLAS_PRIVADAS = [
   'vehiculo',
   'cambiar-password',
   'dos-factores',
+  'viajar',
 ];
-const PESTANAS_PRIVADAS = ['turnos', 'flota', 'mis-turnos', 'viajar'];
+const PESTANAS_PRIVADAS = ['turnos', 'flota', 'mis-turnos'];
 
 function Navegacion() {
   const router = useRouter();
@@ -29,7 +30,7 @@ function Navegacion() {
     const enPestanaPrivada = primero === '(tabs)' && PESTANAS_PRIVADAS.includes(segundo);
     if (!enPestanaPrivada && !PANTALLAS_PRIVADAS.includes(primero)) return;
 
-    if (enPestanaPrivada) router.navigate('/usuario');
+    if (enPestanaPrivada) router.navigate('/');
     else if (router.canDismiss()) router.dismissAll();
     router.push('/login');
   }, [cargando, usuario, primero, segundo, router]);
@@ -43,6 +44,9 @@ function Navegacion() {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="cuenta" options={{ title: 'Tu cuenta' }} />
+      <Stack.Screen name="terminos" options={{ title: 'Términos y privacidad' }} />
+      <Stack.Screen name="viajar" options={{ title: 'Subir a una micro' }} />
       <Stack.Screen name="login" options={{ title: 'Iniciar sesión' }} />
       <Stack.Screen name="google" options={{ headerShown: false, animation: 'none' }} />
       <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
@@ -50,8 +54,9 @@ function Navegacion() {
       <Stack.Screen name="recuperar" options={{ title: 'Recuperar contraseña' }} />
       <Stack.Screen name="cambiar-password" options={{ title: 'Cambiar contraseña' }} />
       <Stack.Screen name="dos-factores" options={{ title: 'Verificación en dos pasos' }} />
-      <Stack.Screen name="linea/[id]" options={{ title: 'Línea' }} />
-      <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero' }} />
+      {/* Pantallas con mapa: sin barra superior, con botón flotante para volver. */}
+      <Stack.Screen name="linea/[id]" options={{ title: 'Línea', headerShown: false }} />
+      <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero', headerShown: false }} />
       <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
       <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
       <Stack.Screen name="vehiculo/[id]" options={{ title: 'Vehículo' }} />

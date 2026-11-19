@@ -46,7 +46,7 @@ export default function LoginScreen() {
 
   function entrar(datos: Parameters<typeof sesion.iniciarSesion>[0]) {
     sesion.iniciarSesion(datos);
-    router.dismissTo('/usuario');
+    router.dismissTo('/');
   }
 
   function enviarCredenciales() {
@@ -187,7 +187,15 @@ export default function LoginScreen() {
       <Text style={styles.separadorTexto}>o</Text>
       <BotonGoogle onResultado={usarRespuestaGoogle} onError={setError} deshabilitado={enviando} />
       <Text style={styles.legal}>
-        Al continuar con Google aceptas la política de privacidad y los términos de uso de VoyBus.
+        Al continuar con Google aceptas la{' '}
+        <Text
+          style={styles.enlace}
+          onPress={() => router.push('/terminos')}
+          accessibilityRole="link"
+        >
+          política de privacidad y los términos de uso
+        </Text>{' '}
+        de VoyBus.
       </Text>
       <Boton
         titulo="Olvidé mi contraseña"
@@ -220,5 +228,6 @@ const styles = StyleSheet.create({
   ayuda: { fontSize: 14, color: colors.textMuted },
   separador: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
   separadorTexto: { textAlign: 'center', color: colors.textMuted },
+  enlace: { color: colors.primary, fontWeight: '600' },
   legal: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
 });
