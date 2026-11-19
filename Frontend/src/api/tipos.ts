@@ -355,3 +355,61 @@ export interface AvanceViaje {
   fuera_de_recorrido: boolean;
   solicitudes_cerradas: number;
 }
+
+// ───── RED-03 y ADM-04: vehículos en circulación ─────
+
+export interface VehiculoCirculacion {
+  viaje_id: number;
+  vehiculo: { id: number; identificador: string };
+  linea: { id: number; codigo: string; nombre: string; color: string };
+  recorrido: { id: number; sentido: Sentido; destino: string | null };
+  ultima_ubicacion: { latitud: number; longitud: number; registrado_en: string } | null;
+  segundos_desde_actualizacion: number | null;
+  /** Más de 30 s sin datos: se muestra la última posición conocida, avisando que está atrasada. */
+  ubicacion_atrasada: boolean;
+  ultimo_orden_superado: number;
+  siguiente_paradero: ParaderoDeRecorrido | null;
+}
+
+/** Una micro que se dirige a un paradero. */
+export interface MicroProxima extends VehiculoCirculacion {
+  /** Paraderos que le faltan antes de llegar (0 = este es su próximo paradero). */
+  paraderos_antes: number;
+  distancia_m: number | null;
+}
+
+export interface ParaderoCercano extends Paradero {
+  distancia_m: number;
+}
+
+export interface VehiculoMonitoreo extends VehiculoCirculacion {
+  conductor: { id: number; nombre: string };
+  turno: {
+    id: number;
+    estado: EstadoTurno;
+    inicio_planificado: string;
+    termino_planificado: string;
+    inicio_real: string | null;
+  };
+  estado_vehiculo: EstadoVehiculo;
+  solicitudes_pendientes: {
+    paradero: { id: number; codigo: string; nombre: string; orden: number };
+    total: number;
+  }[];
+  incidencias: { id: number; tipo: 'vehiculo' | 'recorrido'; descripcion: string; fecha: string }[];
+}
+
+export interface Monitoreo {
+  resumen: {
+    en_circulacion: number;
+    con_ubicacion_atrasada: number;
+    con_incidencias: number;
+    solicitudes_pendientes: number;
+  };
+  vehiculos: VehiculoMonitoreo[];
+}
+
+export interface EstadoFlotaSimulada {
+  activa: boolean;
+  vehiculos: { identificador: string; linea: string; viaje_id: number; avance: number }[];
+}

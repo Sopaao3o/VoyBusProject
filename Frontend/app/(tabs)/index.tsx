@@ -1,19 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type MapView from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  microsProximas,
+  paraderosCercanos,
+  vehiculosEnCirculacion,
+} from '../../src/api/circulacion';
 import { listarLineas, listarParaderos } from '../../src/api/red';
+import type { MicroProxima, VehiculoCirculacion } from '../../src/api/tipos';
 import { Cargando, ErrorMensaje, Vacio } from '../../src/components/Estados';
 import { BotonFlotante } from '../../src/components/mapa/BotonFlotante';
+import { FichaVehiculo } from '../../src/components/mapa/FichaVehiculo';
 import { FilaLinea, FilaParadero } from '../../src/components/mapa/Filas';
 import { Mapa } from '../../src/components/mapa/Mapa';
 import { MarcadorParadero } from '../../src/components/mapa/MarcadorParadero';
+import { MarcadorVehiculo } from '../../src/components/mapa/MarcadorVehiculo';
 import { PanelInferior } from '../../src/components/mapa/PanelInferior';
+import { TarjetaCercano } from '../../src/components/mapa/TarjetaCercano';
+import { Monitoreo } from '../../src/components/monitoreo/Monitoreo';
 import { useApi } from '../../src/hooks/useApi';
 import { useRetraso } from '../../src/hooks/useBusqueda';
+import { useEnVivo } from '../../src/hooks/useEnVivo';
 import { useFavoritos } from '../../src/hooks/useFavoritos';
 import { useMiUbicacion } from '../../src/hooks/useMiUbicacion';
 import { usePantallaMapa } from '../../src/hooks/usePantallaMapa';
@@ -22,8 +33,9 @@ import { colors } from '../../src/theme/colors';
 
 type Vista = 'lineas' | 'paraderos' | 'favoritos';
 
-// Alturas del panel: el pasajero necesita espacio extra para el botón de subir a una micro.
-const ALTURAS_PASAJERO = [250, 0.45, 0.88];
+// Alturas del panel: el pasajero necesita espacio para su paradero más cercano y el botón de
+// subir a una micro.
+const ALTURAS_PASAJERO = [340, 0.55, 0.88];
 const ALTURAS_PERSONAL = [180, 0.45, 0.88];
 
 const BUSCAR: Record<Vista, string> = {
@@ -32,9 +44,19 @@ const BUSCAR: Record<Vista, string> = {
   favoritos: 'Buscar en tus favoritos',
 };
 
-// Inicio: el mapa con los paraderos (RED-02) y un panel para buscar líneas (RED-01) y paraderos.
-// Sirve igual con o sin sesión; el pasajero tiene además el acceso para subir a una micro.
+// Inicio. El administrador ve el monitoreo de la operación (ADM-04); los demás, el mapa.
 export default function InicioScreen() {
+  const { usuario } = useUsuario();
+  return usuario?.rol === 'administrador' ? <Monitoreo /> : <InicioMapa />;
+}
+
+/** Coordenada redondeada (unos 10 m): evita repetir la búsqueda por cambios mínimos del GPS. */
+const redondear = (n: number | undefined) => (n === undefined ? null : Math.round(n * 1e4) / 1e4);
+
+// El mapa con los paraderos (RED-02) y las micros en circulación (RED-03), tu paradero más
+// cercano con las micros que vienen, y un panel para buscar líneas (RED-01) y paraderos.
+// Sirve igual con o sin sesión; el pasajero tiene además el acceso para subir a una micro.
+function InicioMapa() {
   usePantallaMapa();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -42,6 +64,33 @@ export default function InicioScreen() {
   const favoritos = useFavoritos();
   const ubicacion = useMiUbicacion();
   const mapa = useRef<MapView>(null);
+  const [elegido, setElegido] = useState<number | null>(null);
+
+  // RED-03: las micros en circulación se actualizan solas cada 5 segundos.
+  const vehiculos = useEnVivo(() => vehiculosEnCirculacion());
+  const seleccionado = vehiculos.datos?.find((v) => v.viaje_id === elegido) ?? null;
+
+  // Tu paradero más cercano (si ya diste permiso de ubicación) y las micros que vienen hacia él.
+  const { actualizarSiPermitida } = ubicacion;
+  useFocusEffect(
+    useCallback(() => {
+      void actualizarSiPermitida();
+    }, [actualizarSiPermitida]),
+  );
+  const latitud = redondear(ubicacion.posicion?.latitude);
+  const longitud = redondear(ubicacion.posicion?.longitude);
+  const cercanos = useApi(
+    () =>
+      latitud !== null && longitud !== null
+        ? paraderosCercanos(latitud, longitud, 1)
+        : Promise.resolve([]),
+    [latitud, longitud],
+  );
+  const cercano = cercanos.datos?.[0] ?? null;
+  const proximas = useEnVivo(
+    () => (cercano ? microsProximas(cercano.id) : Promise.resolve([] as MicroProxima[])),
+    [cercano?.id ?? null],
+  );
 
   const [vista, setVista] = useState<Vista>('lineas');
   const [texto, setTexto] = useState('');
@@ -58,7 +107,7 @@ export default function InicioScreen() {
   const paraderosVisibles = (paraderos.datos ?? []).filter(
     (p) => !enFavoritos || favoritos.ids.has(p.id),
   );
-  const esPersonal = usuario?.rol === 'administrador' || usuario?.rol === 'conductor';
+  const esPersonal = usuario?.rol === 'conductor';
   const alturas = esPersonal ? ALTURAS_PERSONAL : ALTURAS_PASAJERO;
 
   const vistas: { valor: Vista; titulo: string }[] = [
@@ -73,6 +122,28 @@ export default function InicioScreen() {
     const punto = await ubicacion.obtener();
     if (punto) {
       mapa.current?.animateToRegion({ ...punto, latitudeDelta: 0.02, longitudeDelta: 0.02 }, 600);
+    }
+  }
+
+  function abrirLineaDe(v: VehiculoCirculacion) {
+    router.push({
+      pathname: '/linea/[id]',
+      params: { id: v.linea.id, recorrido: v.recorrido.id, viaje: v.viaje_id },
+    });
+  }
+
+  function elegirVehiculo(v: VehiculoCirculacion) {
+    setElegido(v.viaje_id);
+    if (v.ultima_ubicacion) {
+      mapa.current?.animateToRegion(
+        {
+          latitude: v.ultima_ubicacion.latitud,
+          longitude: v.ultima_ubicacion.longitud,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        },
+        500,
+      );
     }
   }
 
@@ -131,15 +202,25 @@ export default function InicioScreen() {
     <View style={styles.pantalla}>
       <Mapa
         ref={mapa}
-        showsUserLocation={ubicacion.permitida}
+        showsUserLocation={ubicacion.permitida === true}
         mapPadding={{ top: insets.top + 64, right: 0, bottom: alturaPanel, left: 0 }}
+        onPress={() => setElegido(null)}
       >
         {paraderosVisibles.map((p) => (
           <MarcadorParadero
             key={p.id}
             paradero={p}
             favorito={favoritos.ids.has(p.id)}
+            destacado={p.id === cercano?.id && !esPersonal}
             onPress={() => router.push(`/paradero/${p.id}`)}
+          />
+        ))}
+        {(vehiculos.datos ?? []).map((v) => (
+          <MarcadorVehiculo
+            key={v.viaje_id}
+            vehiculo={v}
+            seleccionado={v.viaje_id === elegido}
+            onPress={() => elegirVehiculo(v)}
           />
         ))}
       </Mapa>
@@ -161,6 +242,35 @@ export default function InicioScreen() {
         onAltura={setAlturaPanel}
         encabezado={
           <View style={styles.encabezado}>
+            {seleccionado ? (
+              <FichaVehiculo
+                vehiculo={seleccionado}
+                onVerLinea={() => abrirLineaDe(seleccionado)}
+                onCerrar={() => setElegido(null)}
+              />
+            ) : (
+              !esPersonal && (
+                <TarjetaCercano
+                  permitida={ubicacion.permitida}
+                  cargando={cercanos.cargando}
+                  paradero={cercano}
+                  micros={proximas.datos ?? []}
+                  onActivarUbicacion={centrarEnMi}
+                  onAbrirParadero={(id) => router.push(`/paradero/${id}`)}
+                  onAbrirMicro={abrirLineaDe}
+                />
+              )
+            )}
+            {!esPersonal && (
+              <Pressable
+                style={({ pressed }) => [styles.subir, pressed && styles.subirPresionado]}
+                onPress={() => router.push('/viajar')}
+                accessibilityRole="button"
+              >
+                <Ionicons name="bus" size={20} color={colors.surface} />
+                <Text style={styles.subirTexto}>Subir a una micro</Text>
+              </Pressable>
+            )}
             <View style={styles.buscador}>
               <Ionicons name="search" size={20} color={colors.textMuted} />
               <TextInput
@@ -204,16 +314,6 @@ export default function InicioScreen() {
                 );
               })}
             </View>
-            {!esPersonal && (
-              <Pressable
-                style={({ pressed }) => [styles.subir, pressed && styles.subirPresionado]}
-                onPress={() => router.push('/viajar')}
-                accessibilityRole="button"
-              >
-                <Ionicons name="bus" size={20} color={colors.surface} />
-                <Text style={styles.subirTexto}>Subir a una micro</Text>
-              </Pressable>
-            )}
           </View>
         }
       >

@@ -74,6 +74,15 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
 - **Simular recorrido (solo desarrollo):** en el turno del conductor hay un interruptor que
   envía posiciones falsas que avanzan por los paraderos a unos 36 km/h, por la misma ruta del
   GPS. Sirve para probar y grabar sin salir a la calle.
+- **Micros en vivo (RED-03):** el mapa de inicio, la línea y el paradero muestran las micros en
+  circulación y se actualizan solos cada 5 segundos. Una micro con la ubicación atrasada (más de
+  30 s sin datos) se ve gris y con borde punteado en su última posición, con la hora.
+- **Tu paradero más cercano:** si ya diste permiso de ubicación, el inicio muestra el paradero más
+  cercano y las micros que vienen hacia él (cuántos paraderos y metros les faltan).
+- **Monitoreo (ADM-04):** el administrador abre la app en el mapa de la operación; al tocar una
+  micro ve conductor, turno, ubicación, solicitudes pendientes, estado e incidencias.
+- **Simulador de flota (solo desarrollo):** desde el monitoreo se pueden poner en ruta BUS-02 a
+  BUS-05 (o con `SIMULAR_FLOTA=1` en el backend), para ver el mapa con varias micros.
 - Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
   aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
@@ -126,11 +135,12 @@ Frontend/
 | RED-02    | Paraderos en el mapa y en el panel (con favoritos); detalle: líneas, sentidos y favorito                                                                     |
 | VIA-02    | Subir a una micro: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                         |
 | VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
+| RED-03    | Micros en vivo en el inicio, la línea (solo las de esa línea) y el paradero (las que se acercan)                                                             |
+| ADM-04    | Monitoreo del administrador: mapa con las micros y detalle de cada una                                                                                       |
 | VEH-01    | Turno del conductor: comparte el GPS durante el viaje y muestra señal, última hora y siguiente paradero                                                      |
 | ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente
 
 - Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de Subir a una micro.
-- Ubicación de los vehículos en el mapa para pasajeros y administrador (RED-03, ADM-04). Por ahora el recorrido se dibuja con
-  líneas rectas entre paraderos, no por las calles.
+- El recorrido se dibuja con líneas rectas entre paraderos, no por las calles.

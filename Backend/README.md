@@ -50,7 +50,7 @@ Backend/
 │   │   ├── favoritos/          # RED-02: paraderos favoritos
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
-│   │   ├── ubicacion/          # VEH-01: GPS del conductor y avance por el recorrido
+│   │   ├── ubicacion/          # VEH-01 GPS, RED-03 vehículos, ADM-04 monitoreo, simulador de flota
 │   │   └── viajes/             # VIA-02 y simulador
 │   ├── routes/health.routes.js
 │   └── utils/httpErrors.js
@@ -440,6 +440,27 @@ Body: `{ "latitud": -23.63, "longitud": -70.40, "precision_m": 8, "origen": "gps
   `precision_insuficiente` o `fuera_de_recorrido`).
 - El último paradero no se "supera": sus solicitudes se cierran al finalizar el viaje.
 
+### Vehículos en circulación (RED-03) · públicos
+
+| Método y ruta                        | Descripción                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `GET /api/v1/vehiculos?linea_id=1`   | Vehículos con viaje en curso (todos o de una línea), con última ubicación. |
+| `GET /api/v1/paraderos/cercanos`     | Paraderos a menos de 1,5 km. Query: `latitud`, `longitud`, `limite`.       |
+| `GET /api/v1/paraderos/:id/proximas` | Micros que se dirigen al paradero: paraderos y metros que les faltan.      |
+
+Cada vehículo trae identificador, línea, sentido, destino, `ultima_ubicacion` con
+`registrado_en`, `segundos_desde_actualizacion` y `ubicacion_atrasada` (más de 30 s sin datos:
+se conserva la última posición y se avisa). Los viajes finalizados dejan de aparecer.
+
+### Monitoreo de la operación (ADM-04) · administrador
+
+| Método y ruta                 | Descripción                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/v1/admin/monitoreo` | Resumen y vehículos en circulación con conductor, turno, ubicación, solicitudes pendientes por paradero, estado e incidencias. |
+
+La falta de señal solo se informa (`ubicacion_atrasada`): no marca al conductor como ausente ni
+finaliza el viaje.
+
 ### Simulador (solo desarrollo)
 
 Existe mientras `NODE_ENV` no sea `production`. Sirve para probar sin salir a la calle: la app
@@ -449,6 +470,15 @@ misma ruta del GPS, y además está esta ruta para saltar al siguiente paradero:
 | Método y ruta                               | Descripción                               |
 | ------------------------------------------- | ----------------------------------------- |
 | `POST /api/v1/simulador/viajes/:id/avanzar` | Avanza el vehículo al siguiente paradero. |
+| `GET /api/v1/simulador/flota`               | Estado del simulador de flota.            |
+| `POST /api/v1/simulador/flota/iniciar`      | Pone 4 micros de demostración en ruta.    |
+| `POST /api/v1/simulador/flota/detener`      | Cierra sus viajes y turnos.               |
+
+El **simulador de flota** mueve BUS-02 a BUS-05 por las líneas 103 y 107 (ida y vuelta) y envía
+sus posiciones por la misma ruta del GPS. BUS-04 deja de enviar a ratos para mostrar una ubicación
+atrasada. Usa conductores de demostración sin contraseña (no se puede entrar con ellos). Con
+`SIMULAR_FLOTA=1` en `.env` arranca solo junto al servidor, y al reiniciar se limpia lo que haya
+quedado de una simulación anterior.
 
 ## Base de datos
 

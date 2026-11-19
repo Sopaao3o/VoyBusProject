@@ -7,17 +7,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { textoDeError } from '../../src/api/client';
 import { agregarParaderoFavorito, quitarParaderoFavorito } from '../../src/api/favoritos';
+import { microsProximas } from '../../src/api/circulacion';
 import { obtenerParadero } from '../../src/api/red';
 import { Cargando, ErrorMensaje } from '../../src/components/Estados';
 import { Aviso, InsigniaLinea } from '../../src/components/Etiquetas';
 import { BotonFlotante } from '../../src/components/mapa/BotonFlotante';
 import { Mapa } from '../../src/components/mapa/Mapa';
 import { MarcadorParadero } from '../../src/components/mapa/MarcadorParadero';
+import { MarcadorVehiculo } from '../../src/components/mapa/MarcadorVehiculo';
 import { PanelInferior } from '../../src/components/mapa/PanelInferior';
 import { useApi } from '../../src/hooks/useApi';
+import { useEnVivo } from '../../src/hooks/useEnVivo';
 import { useFavoritos } from '../../src/hooks/useFavoritos';
 import { usePantallaMapa } from '../../src/hooks/usePantallaMapa';
 import { colors } from '../../src/theme/colors';
+import { textoDistancia, textoHace, textoParaderosAntes } from '../../src/utils/textos';
 
 const ALTURAS = [0.45, 0.88];
 
@@ -37,6 +41,8 @@ export default function ParaderoScreen() {
     recargar,
   } = useApi(() => obtenerParadero(paraderoId), [paraderoId]);
   const favoritos = useFavoritos();
+  // RED-03: micros que vienen hacia este paradero, actualizadas cada 5 segundos.
+  const proximas = useEnVivo(() => microsProximas(paraderoId), [paraderoId]);
   const [guardando, setGuardando] = useState(false);
   const [indice, setIndice] = useState(0);
   const [alturaPanel, setAlturaPanel] = useState(0);
@@ -108,6 +114,9 @@ export default function ParaderoScreen() {
         }}
       >
         <MarcadorParadero paradero={paradero} destacado />
+        {(proximas.datos ?? []).map((m) => (
+          <MarcadorVehiculo key={m.viaje_id} vehiculo={m} />
+        ))}
       </Mapa>
       {volver}
 
@@ -146,6 +155,40 @@ export default function ParaderoScreen() {
             <Text style={styles.dato}>
               Con una cuenta de pasajero puedes guardar este paradero en tus favoritos.
             </Text>
+          )}
+
+          <Text style={styles.subtitulo}>MICROS QUE SE ACERCAN</Text>
+          {(proximas.datos ?? []).length === 0 ? (
+            <Text style={styles.dato}>Ninguna micro viene hacia este paradero ahora.</Text>
+          ) : (
+            (proximas.datos ?? []).map((m) => (
+              <Pressable
+                key={m.viaje_id}
+                style={({ pressed }) => [styles.proxima, pressed && styles.presionado]}
+                onPress={() =>
+                  router.push({
+                    pathname: '/linea/[id]',
+                    params: { id: m.linea.id, recorrido: m.recorrido.id, viaje: m.viaje_id },
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Línea ${m.linea.codigo}, ${textoParaderosAntes(m.paraderos_antes)}`}
+              >
+                <InsigniaLinea linea={m.linea} />
+                <View style={styles.textos}>
+                  <Text style={styles.lineaNombre}>
+                    {m.recorrido.destino ? `Hacia ${m.recorrido.destino}` : m.linea.nombre}
+                  </Text>
+                  <Text style={[styles.dato, m.ubicacion_atrasada && styles.atrasada]}>
+                    {textoParaderosAntes(m.paraderos_antes)}
+                    {m.distancia_m !== null ? ` · ${textoDistancia(m.distancia_m)}` : ''} ·{' '}
+                    {m.ubicacion_atrasada
+                      ? 'ubicación atrasada'
+                      : `actualizada ${textoHace(m.segundos_desde_actualizacion ?? 0)}`}
+                  </Text>
+                </View>
+              </Pressable>
+            ))
           )}
 
           <Text style={styles.subtitulo}>LÍNEAS QUE PASAN</Text>
@@ -217,6 +260,15 @@ const styles = StyleSheet.create({
   estrellaActiva: { backgroundColor: colors.primary, borderColor: colors.primary },
   contenido: { paddingHorizontal: 16, paddingBottom: 16, gap: 12 },
   subtitulo: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginTop: 4 },
+  proxima: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 12,
+  },
+  atrasada: { color: colors.warning, fontWeight: '600' },
   linea: { backgroundColor: colors.background, borderRadius: 14, padding: 12, gap: 10 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   lineaNombre: { flex: 1, fontSize: 16, color: colors.text, fontWeight: '600' },

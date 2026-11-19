@@ -6,14 +6,18 @@ import type MapView from 'react-native-maps';
 import { Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { vehiculosEnCirculacion } from '../../src/api/circulacion';
 import { obtenerLinea } from '../../src/api/red';
 import { Cargando, ErrorMensaje } from '../../src/components/Estados';
 import { Aviso, InsigniaLinea } from '../../src/components/Etiquetas';
 import { BotonFlotante } from '../../src/components/mapa/BotonFlotante';
+import { TextoActualizacion } from '../../src/components/mapa/FichaVehiculo';
 import { Mapa } from '../../src/components/mapa/Mapa';
 import { MarcadorParadero } from '../../src/components/mapa/MarcadorParadero';
+import { MarcadorVehiculo } from '../../src/components/mapa/MarcadorVehiculo';
 import { PanelInferior } from '../../src/components/mapa/PanelInferior';
 import { useApi } from '../../src/hooks/useApi';
+import { useEnVivo } from '../../src/hooks/useEnVivo';
 import { usePantallaMapa } from '../../src/hooks/usePantallaMapa';
 import { colors } from '../../src/theme/colors';
 
@@ -21,10 +25,15 @@ const ALTURAS = [0.42, 0.88];
 
 // RED-01: una línea. El mapa dibuja el recorrido elegido (ida o vuelta) con sus paraderos
 // numerados, y el panel muestra días, horarios y paraderos en orden.
-// `?recorrido=` permite llegar con un sentido ya elegido.
+// RED-03: también muestra, en vivo, solo las micros de esta línea que tienen un viaje en curso.
+// `?recorrido=` permite llegar con un sentido ya elegido, y `?viaje=` con una micro marcada.
 export default function LineaScreen() {
   usePantallaMapa();
-  const { id, recorrido } = useLocalSearchParams<{ id: string; recorrido?: string }>();
+  const { id, recorrido, viaje } = useLocalSearchParams<{
+    id: string;
+    recorrido?: string;
+    viaje?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const mapa = useRef<MapView>(null);
@@ -33,12 +42,17 @@ export default function LineaScreen() {
   const [indice, setIndice] = useState(0);
   const [alturaPanel, setAlturaPanel] = useState(0);
   const [mapaListo, setMapaListo] = useState(false);
+  const [microElegida, setMicroElegida] = useState<number | null>(viaje ? Number(viaje) : null);
+  const vehiculos = useEnVivo(() => vehiculosEnCirculacion(Number(id)), [id]);
 
   // Si no se eligió ninguno (o el elegido ya no existe), se muestra el primero: la ida.
   const actual = linea?.recorridos.find((r) => r.id === elegido) ?? linea?.recorridos[0];
   const paraderos = actual ? [...actual.paraderos].sort((a, b) => a.orden - b.orden) : [];
   const puntos = paraderos.map((p) => ({ latitude: p.latitud, longitude: p.longitud }));
   const clavePuntos = JSON.stringify(puntos);
+
+  // Las micros del sentido elegido; las del otro sentido no se muestran para no confundir.
+  const micros = (vehiculos.datos ?? []).filter((v) => v.recorrido.id === actual?.id);
 
   // Al cambiar de recorrido, el mapa se ajusta para que se vea completo sobre el panel.
   useEffect(() => {
@@ -93,6 +107,14 @@ export default function LineaScreen() {
             color={linea.color}
             orden={p.orden}
             onPress={() => router.push(`/paradero/${p.id}`)}
+          />
+        ))}
+        {micros.map((v) => (
+          <MarcadorVehiculo
+            key={v.viaje_id}
+            vehiculo={v}
+            seleccionado={v.viaje_id === microElegida}
+            onPress={() => setMicroElegida(v.viaje_id)}
           />
         ))}
       </Mapa>
@@ -150,6 +172,49 @@ export default function LineaScreen() {
                 {actual.dias_funcionamiento} · {actual.horarios}
               </Text>
             </View>
+
+            <Text style={styles.subtitulo}>MICROS EN CIRCULACIÓN ({micros.length})</Text>
+            {micros.length === 0 ? (
+              <Text style={styles.dato}>Ninguna micro de este sentido está en ruta ahora.</Text>
+            ) : (
+              micros.map((v) => (
+                <Pressable
+                  key={v.viaje_id}
+                  style={({ pressed }) => [
+                    styles.micro,
+                    v.viaje_id === microElegida && styles.microElegida,
+                    pressed && styles.presionado,
+                  ]}
+                  onPress={() => {
+                    setMicroElegida(v.viaje_id);
+                    if (v.ultima_ubicacion) {
+                      mapa.current?.animateToRegion(
+                        {
+                          latitude: v.ultima_ubicacion.latitud,
+                          longitude: v.ultima_ubicacion.longitud,
+                          latitudeDelta: 0.03,
+                          longitudeDelta: 0.03,
+                        },
+                        500,
+                      );
+                    }
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Micro ${v.vehiculo.identificador}`}
+                >
+                  <Ionicons name="bus" size={20} color={linea.color} />
+                  <View style={styles.textos}>
+                    <Text style={styles.paraderoNombre}>
+                      {v.vehiculo.identificador}
+                      {v.siguiente_paradero ? ` · próximo: ${v.siguiente_paradero.nombre}` : ''}
+                    </Text>
+                    <TextoActualizacion vehiculo={v} />
+                  </View>
+                </Pressable>
+              ))
+            )}
+
+            <Text style={styles.subtitulo}>PARADEROS</Text>
             {paraderos.map((p, i) => (
               <Pressable
                 key={p.id}
@@ -213,6 +278,24 @@ const styles = StyleSheet.create({
   opcionTextoActivo: { color: colors.text },
   contenido: { paddingHorizontal: 16, paddingBottom: 16 },
   horario: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  subtitulo: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  micro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    marginBottom: 6,
+  },
+  microElegida: { borderWidth: 2, borderColor: colors.text },
   paradero: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   presionado: { opacity: 0.6 },
   tramo: { width: 28, alignItems: 'center', alignSelf: 'stretch' },

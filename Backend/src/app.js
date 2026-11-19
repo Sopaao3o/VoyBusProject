@@ -29,8 +29,19 @@ const { createViajesService } = require('./modules/viajes/viajes.service');
 const { createViajesController } = require('./modules/viajes/viajes.controller');
 const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/viajes.routes');
 const { createUbicacionService } = require('./modules/ubicacion/ubicacion.service');
-const { createUbicacionController } = require('./modules/ubicacion/ubicacion.controller');
-const { createUbicacionRoutes } = require('./modules/ubicacion/ubicacion.routes');
+const {
+  createUbicacionController,
+  createCirculacionController,
+  createSimuladorFlotaController,
+} = require('./modules/ubicacion/ubicacion.controller');
+const {
+  createUbicacionRoutes,
+  createCirculacionRoutes,
+  createMonitoreoRoutes,
+  createSimuladorFlotaRoutes,
+} = require('./modules/ubicacion/ubicacion.routes');
+const { createCirculacionService } = require('./modules/ubicacion/circulacion.service');
+const { createSimuladorFlota } = require('./modules/ubicacion/simulador-flota');
 
 /**
  * @param {object} deps
@@ -42,6 +53,8 @@ const { createUbicacionRoutes } = require('./modules/ubicacion/ubicacion.routes'
  * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
  * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
  * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
+ * @param {ReturnType<typeof createSimuladorFlota>} [deps.flota] simulador de flota (si se omite y
+ *   el simulador está activo, se crea uno)
  */
 function createApp({
   models,
@@ -51,6 +64,7 @@ function createApp({
   exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
   exponerTokenRecuperacion = exponerCodigoVerificacion,
   google = createGoogleOAuth(),
+  flota,
 }) {
   const app = express();
 
@@ -70,6 +84,8 @@ function createApp({
   const v1 = express.Router();
   const autenticar = crearAutenticacion({ models });
   v1.use('/auth', createAuthRoutes(auth, { autenticar }));
+  const circulacion = createCirculacionController(createCirculacionService(models, { ahora }));
+  v1.use(createCirculacionRoutes(circulacion)); // antes que /paraderos/:id de la red
   v1.use(createRedRoutes(createRedController(createRedService(models))));
   v1.use(
     '/favoritos',
@@ -85,9 +101,15 @@ function createApp({
   v1.use('/conductor', autenticar, createConductorRoutes(conductor));
   const ubicacion = createUbicacionService(models, { ahora, permitirSimulacion: simulador });
   v1.use('/conductor', autenticar, createUbicacionRoutes(createUbicacionController(ubicacion)));
+  v1.use('/admin', autenticar, createMonitoreoRoutes(circulacion));
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
-  if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));
+  if (simulador) {
+    v1.use('/simulador', createSimuladorRoutes(viajes));
+    flota ??= createSimuladorFlota(models, ubicacion, { ahora });
+    v1.use('/simulador', createSimuladorFlotaRoutes(createSimuladorFlotaController(flota)));
+    app.locals.flota = flota; // server.js lo limpia al arrancar y puede iniciarlo solo
+  }
   app.use('/api/v1', v1);
 
   app.use((req, res) => {

@@ -90,8 +90,29 @@ function calcularAvance(paraderos, ultimoSuperado, punto) {
   return { ultimoSuperado: nuevo, lejania: proyeccion.lejania };
 }
 
+/** El punto que queda a `metros` del primer paradero, avanzando por el recorrido. */
+function puntoEnRecorrido(paraderos, metros) {
+  let restante = Math.max(metros, 0);
+  for (let i = 1; i < paraderos.length; i++) {
+    const tramo = distancia(paraderos[i - 1], paraderos[i]);
+    if (restante <= tramo && tramo > 0) {
+      const t = restante / tramo;
+      const a = paraderos[i - 1];
+      const b = paraderos[i];
+      return {
+        latitud: a.latitud + (b.latitud - a.latitud) * t,
+        longitud: a.longitud + (b.longitud - a.longitud) * t,
+      };
+    }
+    restante -= tramo;
+  }
+  const ultimo = paraderos[paraderos.length - 1];
+  return { latitud: ultimo.latitud, longitud: ultimo.longitud };
+}
+
 module.exports = {
   distancia,
+  puntoEnRecorrido,
   proyectar,
   distanciasAcumuladas,
   calcularAvance,

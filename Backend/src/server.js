@@ -22,14 +22,25 @@ async function iniciar() {
     await cargarDatosEjemplo(models, { usuariosDemo: process.env.NODE_ENV !== 'production' });
   }
 
+  const app = createApp({
+    models,
+    registro: true,
+    simulador: process.env.NODE_ENV !== 'production',
+  });
+  const { flota } = app.locals;
+  if (flota) {
+    // Micros de una simulación anterior que quedaron "circulando" al apagar el servidor.
+    await flota.limpiarRestos();
+    if (process.env.SIMULAR_FLOTA === '1') {
+      await flota.iniciar();
+      console.log('Simulador de flota: 4 micros en circulación (BUS-02 a BUS-05)');
+    }
+  }
+
   // 0.0.0.0 permite que el celular (misma red Wi-Fi) llegue al servidor del PC.
-  createApp({ models, registro: true, simulador: process.env.NODE_ENV !== 'production' }).listen(
-    PORT,
-    '0.0.0.0',
-    () => {
-      console.log(`VoyBus backend escuchando en http://localhost:${PORT}`);
-    },
-  );
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`VoyBus backend escuchando en http://localhost:${PORT}`);
+  });
 }
 
 iniciar().catch((err) => {

@@ -17,4 +17,18 @@ const ubicacionBody = z.object({
   origen: z.enum(['gps', 'simulador'], { error: 'El origen debe ser: gps o simulador' }).optional(),
 });
 
-module.exports = { ubicacionBody };
+const lineaQuery = z.object({
+  linea_id: z.coerce
+    .number({ error: 'La línea debe ser un número' })
+    .int('La línea debe ser un número entero')
+    .positive('La línea debe ser mayor que cero')
+    .optional(),
+});
+
+const cercanosQuery = z.object({
+  latitud: z.coerce.number({ error: 'Indica la latitud' }).min(-90).max(90),
+  longitud: z.coerce.number({ error: 'Indica la longitud' }).min(-180).max(180),
+  limite: z.coerce.number().int().min(1).max(10).optional(),
+});
+
+module.exports = { ubicacionBody, lineaQuery, cercanosQuery };

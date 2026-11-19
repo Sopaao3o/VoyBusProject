@@ -25,10 +25,15 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Mapa',
+          // ADM-04: para el administrador, el mapa es el monitoreo de la operación.
+          title: esAdmin ? 'Monitoreo' : 'Mapa',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" color={color as string} size={size} />
+            <Ionicons
+              name={esAdmin ? 'pulse-outline' : 'map-outline'}
+              color={color as string}
+              size={size}
+            />
           ),
         }}
       />
