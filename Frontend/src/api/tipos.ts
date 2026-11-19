@@ -332,3 +332,26 @@ export interface CambioEstadoVehiculo {
   motivo: string | null;
   fecha: string;
 }
+
+// ───── VEH-01: ubicación del vehículo ─────
+
+export type OrigenUbicacion = 'gps' | 'simulador';
+
+export interface UbicacionBody {
+  latitud: number;
+  longitud: number;
+  precision_m?: number;
+  origen?: OrigenUbicacion;
+}
+
+/** Lo que responde el servidor a cada posición: hasta dónde llegó el vehículo. */
+export interface AvanceViaje {
+  viaje_id: number;
+  registrado_en: string;
+  origen: OrigenUbicacion;
+  ultimo_orden_superado: number;
+  siguiente_paradero: ParaderoDeRecorrido | null;
+  precision_insuficiente: boolean;
+  fuera_de_recorrido: boolean;
+  solicitudes_cerradas: number;
+}

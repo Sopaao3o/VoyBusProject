@@ -1,6 +1,7 @@
 // VIA-02: selección de destino y solicitud digital de parada (vista del pasajero).
 const { Op, UniqueConstraintError } = require('sequelize');
 const { notFound, conflict, badRequest, HttpError } = require('../../utils/httpErrors');
+const { actualizarSolicitudes } = require('./solicitudes');
 
 const TEXTO_CIERRE = {
   paradero_superado: 'El vehículo ya superó tu paradero',
@@ -82,38 +83,6 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
       transaction,
     });
     return presentarSolicitud(s, s.paradero, parada?.orden ?? null);
-  }
-
-  /**
-   * Pone al día las solicitudes abiertas según hasta dónde llegó el vehículo:
-   *  - el vehículo superó el paradero → cerrada
-   *  - el paradero es el siguiente → próxima
-   *  - si no → enviada
-   * (Pasar cerca de un paradero no prueba que el vehículo se haya detenido: nunca se marca "atendida".)
-   */
-  async function actualizarSolicitudes(viaje, transaction) {
-    const abiertas = await SolicitudParada.findAll({
-      where: { viaje_id: viaje.id, estado: abierta },
-      transaction,
-    });
-    let cerradas = 0;
-    for (const s of abiertas) {
-      const parada = await RecorridoParadero.findOne({
-        where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id },
-        transaction,
-      });
-      if (parada.orden <= viaje.ultimo_orden_superado) {
-        await s.update(
-          { estado: 'cerrada', motivo_cierre: 'paradero_superado', cerrada_en: ahoraISO() },
-          { transaction },
-        );
-        cerradas++;
-      } else {
-        const estado = parada.orden === viaje.ultimo_orden_superado + 1 ? 'proxima' : 'enviada';
-        if (s.estado !== estado) await s.update({ estado }, { transaction });
-      }
-    }
-    return cerradas;
   }
 
   return {
@@ -243,7 +212,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
           },
           { transaction },
         );
-        const cerradas = await actualizarSolicitudes(viaje, transaction);
+        const cerradas = await actualizarSolicitudes(models, viaje, ahoraISO, transaction);
         return {
           viaje_id: viaje.id,
           ultimo_orden_superado: viaje.ultimo_orden_superado,

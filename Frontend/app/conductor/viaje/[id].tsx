@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { solicitudesDeParada } from '../../../src/api/conductor';
+import { EstadoGps } from '../../../src/components/EstadoGps';
 import { Cargando, ErrorMensaje } from '../../../src/components/Estados';
 import { useApi } from '../../../src/hooks/useApi';
 import { colors } from '../../../src/theme/colors';
@@ -32,6 +33,7 @@ export default function SolicitudesViajeScreen() {
       refreshControl={<RefreshControl refreshing={false} onRefresh={recargar} />}
     >
       <Stack.Screen options={{ title: 'Solicitudes de parada' }} />
+      <EstadoGps />
       <Text style={styles.resumen}>
         {total === 0
           ? 'Aún no hay solicitudes de parada.'

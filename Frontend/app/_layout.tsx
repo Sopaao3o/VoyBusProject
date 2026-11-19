@@ -2,6 +2,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { GpsConductorProvider } from '../src/session/GpsConductor';
 import { UsuarioProvider, useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
 
@@ -70,8 +71,10 @@ function Navegacion() {
 export default function RootLayout() {
   return (
     <UsuarioProvider>
-      <StatusBar style="light" />
-      <Navegacion />
+      <GpsConductorProvider>
+        <StatusBar style="light" />
+        <Navegacion />
+      </GpsConductorProvider>
     </UsuarioProvider>
   );
 }

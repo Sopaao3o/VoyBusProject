@@ -67,6 +67,13 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   vuelve a la app. Necesita que el backend tenga Google configurado (ver `Backend/README.md`).
 - El mapa usa `react-native-maps`, que funciona en Expo Go sin clave: Google Maps en Android y
   Apple Maps en iOS. El botón de ubicación pide permiso recién al tocarlo (`expo-location`).
+- **GPS del conductor (VEH-01):** al iniciar un viaje la app pide el permiso de ubicación (sin
+  él no se inicia) y envía la posición del teléfono cada 5 segundos hasta finalizarlo, con la
+  pantalla encendida. Funciona en Expo Go con la app abierta; en segundo plano necesitaría un
+  _development build_. Si la app se cierra con un viaje en curso, al volver sigue enviando.
+- **Simular recorrido (solo desarrollo):** en el turno del conductor hay un interruptor que
+  envía posiciones falsas que avanzan por los paraderos a unos 36 km/h, por la misma ruta del
+  GPS. Sirve para probar y grabar sin salir a la calle.
 - Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
   aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
@@ -100,10 +107,10 @@ Frontend/
 │   ├── api/                    # cliente de la API y una función por consulta
 │   ├── components/             # piezas reutilizables (formularios, estados, etiquetas)
 │   │   └── mapa/               # mapa, marcadores, panel deslizable y botones flotantes
+│   ├── session/                # sesión (UsuarioContext) y GPS del conductor (GpsConductor)
 │   ├── hooks/                  # useApi, useBusqueda, useFavoritos, useMiUbicacion, usePantallaMapa...
-│   ├── session/                # sesión
 │   ├── theme/colors.ts         # paleta de VoyBus
-│   └── utils/                  # fechas y textos
+│   └── utils/                  # fechas, textos y cálculos sobre el recorrido
 └── .env.example
 ```
 
@@ -119,10 +126,11 @@ Frontend/
 | RED-02    | Paraderos en el mapa y en el panel (con favoritos); detalle: líneas, sentidos y favorito                                                                     |
 | VIA-02    | Subir a una micro: elegir viaje, destino (nombre, código y orden) y solicitar parada                                                                         |
 | VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
+| VEH-01    | Turno del conductor: comparte el GPS durante el viaje y muestra señal, última hora y siguiente paradero                                                      |
 | ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente
 
 - Vinculación al viaje por QR (VIA-01), que reemplaza la lista provisoria de Subir a una micro.
-- Ubicación de los vehículos en el mapa (VEH-01 y RED-03). Por ahora el recorrido se dibuja con
+- Ubicación de los vehículos en el mapa para pasajeros y administrador (RED-03, ADM-04). Por ahora el recorrido se dibuja con
   líneas rectas entre paraderos, no por las calles.

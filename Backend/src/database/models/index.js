@@ -49,6 +49,8 @@ function initModels(sequelize) {
   Turno.hasMany(Viaje, { foreignKey: 'turno_id', as: 'viajes' });
   Viaje.belongsTo(Turno, { foreignKey: 'turno_id', as: 'turno' });
   Viaje.belongsTo(Recorrido, { foreignKey: 'recorrido_id', as: 'recorrido' });
+  Viaje.hasMany(UbicacionVehiculo, { foreignKey: 'viaje_id', as: 'ubicaciones' });
+  UbicacionVehiculo.belongsTo(Viaje, { foreignKey: 'viaje_id', as: 'viaje' });
 
   // Lo que informan los conductores
   Incidencia.belongsTo(Usuario, { foreignKey: 'conductor_id', as: 'conductor' });

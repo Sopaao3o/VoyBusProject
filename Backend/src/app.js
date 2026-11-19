@@ -28,13 +28,17 @@ const {
 const { createViajesService } = require('./modules/viajes/viajes.service');
 const { createViajesController } = require('./modules/viajes/viajes.controller');
 const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/viajes.routes');
+const { createUbicacionService } = require('./modules/ubicacion/ubicacion.service');
+const { createUbicacionController } = require('./modules/ubicacion/ubicacion.controller');
+const { createUbicacionRoutes } = require('./modules/ubicacion/ubicacion.routes');
 
 /**
  * @param {object} deps
  * @param {ReturnType<import('./database/models').initModels>} deps.models modelos Sequelize
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
- * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
+ * @param {boolean} [deps.simulador] activa el simulador de posiciones: sus rutas y el envío de
+ *   posiciones simuladas desde la app del conductor (solo desarrollo)
  * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
  * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
  * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
@@ -79,6 +83,8 @@ function createApp({
   );
   v1.use('/admin', autenticar, createConductorAdminRoutes(conductor));
   v1.use('/conductor', autenticar, createConductorRoutes(conductor));
+  const ubicacion = createUbicacionService(models, { ahora, permitirSimulacion: simulador });
+  v1.use('/conductor', autenticar, createUbicacionRoutes(createUbicacionController(ubicacion)));
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
   if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));

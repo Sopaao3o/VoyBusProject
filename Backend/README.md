@@ -50,6 +50,7 @@ Backend/
 │   │   ├── favoritos/          # RED-02: paraderos favoritos
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
+│   │   ├── ubicacion/          # VEH-01: GPS del conductor y avance por el recorrido
 │   │   └── viajes/             # VIA-02 y simulador
 │   ├── routes/health.routes.js
 │   └── utils/httpErrors.js
@@ -420,11 +421,30 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 | `GET /api/v1/viajes/:id/solicitudes-parada/mia` | Mi solicitud y su estado.                                               |
 
 Estados de una solicitud: `enviada` → `proxima` (es el siguiente paradero) → `cerrada`
-(motivo `paradero_superado` o `viaje_finalizado`).
+(motivo `paradero_superado` o `viaje_finalizado`). Cambian solos con cada posición del GPS.
+
+### Ubicación del vehículo (VEH-01) · conductor
+
+| Método y ruta                                 | Descripción                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `POST /api/v1/conductor/viajes/:id/ubicacion` | Posición del teléfono durante un viaje en curso. Devuelve el avance. |
+
+Body: `{ "latitud": -23.63, "longitud": -70.40, "precision_m": 8, "origen": "gps" }`
+(`precision_m` y `origen` son opcionales; `origen: "simulador"` solo en desarrollo).
+
+- La app la envía cada 5 segundos. Cada posición se proyecta sobre el recorrido (tramos rectos
+  entre paraderos) y un paradero queda **superado** cuando el vehículo pasa 25 m más allá de él.
+  Con eso se ponen al día las solicitudes de parada.
+- El avance nunca retrocede. Una posición con precisión peor que 100 m, o a más de 250 m del
+  recorrido, se guarda pero no cambia el avance (la respuesta lo indica con
+  `precision_insuficiente` o `fuera_de_recorrido`).
+- El último paradero no se "supera": sus solicitudes se cierran al finalizar el viaje.
 
 ### Simulador (solo desarrollo)
 
-Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar sin GPS real:
+Existe mientras `NODE_ENV` no sea `production`. Sirve para probar sin salir a la calle: la app
+del conductor puede enviar posiciones simuladas por el recorrido (`origen: "simulador"`) por la
+misma ruta del GPS, y además está esta ruta para saltar al siguiente paradero:
 
 | Método y ruta                               | Descripción                               |
 | ------------------------------------------- | ----------------------------------------- |
