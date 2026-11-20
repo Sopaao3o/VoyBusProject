@@ -57,7 +57,7 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
 | Pasajero      | `ana.pasajera@voybus.cl` | Mapa sin pestañas, con el botón **Subir a una micro** |
 | Conductor     | `carlos.rojas@voybus.cl` | Pestañas Mapa y Mis turnos                            |
 | Conductor     | `maria.soto@voybus.cl`   | Pestañas Mapa y Mis turnos                            |
-| Administrador | `admin@voybus.cl`        | Pestañas Mapa, Turnos y Flota                         |
+| Administrador | `admin@voybus.cl`        | Pestañas Monitoreo, Red, Turnos y Flota               |
 
 - La sesión se guarda cifrada en el teléfono (`expo-secure-store`): al reabrir la app sigue
   iniciada. Al cerrar sesión, o si el servidor la rechaza, se borra y la app vuelve al acceso.
@@ -95,6 +95,11 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   al reconectarse. El turno muestra las paradas pendientes en orden del recorrido.
 - **Información atrasada (VIA-03):** si la micro deja de enviar su ubicación, el pasajero ve el
   aviso con la hora de la última actualización y se conserva el último estado de su solicitud.
+- **Gestión de la red (ADM-01):** el administrador tiene la pestaña **Red** con todas las líneas y
+  paraderos (también los desactivados). Crea y edita líneas (código, nombre, color y estado),
+  sus recorridos de ida y vuelta (días, horarios, activo y paraderos en orden, con vista previa
+  en el mapa) y los paraderos (código, nombre, activo y ubicación, que se marca tocando el mapa o
+  arrastrando el marcador). Con viajes en curso, la app explica qué no se puede cambiar todavía.
 - Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
   aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
@@ -121,6 +126,7 @@ Frontend/
 │   ├── linea/[id].tsx          # RED-01: recorrido de la línea dibujado en el mapa
 │   ├── paradero/[id].tsx       # RED-02: paradero en el mapa con sus líneas
 │   ├── turno/                  # ADM-03: detalle y formulario de turnos
+│   ├── admin/                  # ADM-01: editar líneas, recorridos y paraderos
 │   ├── conductor/              # VEH-03: turno del conductor y solicitudes de parada
 │   ├── vehiculo/[id].tsx       # VEH-03: historial de estados e incidencias (administrador)
 │   └── viaje/[id].tsx          # VIA-02: elegir destino y solicitar parada
@@ -152,6 +158,7 @@ Frontend/
 | ADM-04    | Monitoreo del administrador: mapa con las micros y detalle de cada una                                                                                       |
 | VEH-02    | Aviso de parada al conductor (franja, vibración y sonido) y paradas pendientes en orden                                                                      |
 | VEH-01    | Turno del conductor: comparte el GPS durante el viaje y muestra señal, última hora y siguiente paradero                                                      |
+| ADM-01    | Pestaña Red: crear, editar y activar o desactivar líneas, recorridos y paraderos                                                                             |
 | ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 
 ## Pendiente

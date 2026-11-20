@@ -17,8 +17,9 @@ const PANTALLAS_PRIVADAS = [
   'cambiar-password',
   'dos-factores',
   'viajar',
+  'admin',
 ];
-const PESTANAS_PRIVADAS = ['turnos', 'flota', 'mis-turnos'];
+const PESTANAS_PRIVADAS = ['turnos', 'flota', 'mis-turnos', 'red'];
 
 function Navegacion() {
   const router = useRouter();
@@ -64,6 +65,9 @@ function Navegacion() {
         <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
         <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
         <Stack.Screen name="vehiculo/[id]" options={{ title: 'Vehículo' }} />
+        <Stack.Screen name="admin/linea/[id]" options={{ title: 'Línea' }} />
+        <Stack.Screen name="admin/recorrido/[id]" options={{ title: 'Recorrido' }} />
+        <Stack.Screen name="admin/paradero/[id]" options={{ title: 'Paradero' }} />
         <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
         <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
         <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />

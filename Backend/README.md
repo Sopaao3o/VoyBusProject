@@ -46,7 +46,7 @@ Backend/
 │   │   └── validar.js          # valida params, query y body con Zod
 │   ├── modules/
 │   │   ├── auth/               # ACC-01 a ACC-04
-│   │   ├── red/                # RED-01 y RED-02
+│   │   ├── red/                # RED-01, RED-02 y ADM-01 (gestión de la red)
 │   │   ├── favoritos/          # RED-02: paraderos favoritos
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
@@ -508,6 +508,30 @@ quedado de una simulación anterior.
 - Cambios de esquema: crear una migración nueva en `src/database/migrations/`
   (no editar las ya aplicadas).
 
+## Gestión de la red (ADM-01) · administrador
+
+| Método y ruta                                  | Descripción                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET /api/v1/admin/red/lineas`                 | Todas las líneas (también desactivadas) con sus recorridos.                                  |
+| `POST /api/v1/admin/red/lineas`                | Crea. Body: `codigo`, `nombre`, `color` (#RRGGBB), `estado_servicio`.                        |
+| `GET /api/v1/admin/red/lineas/:id`             | Línea con sus recorridos y paraderos en orden.                                               |
+| `PUT /api/v1/admin/red/lineas/:id`             | Edita cualquiera de esos campos.                                                             |
+| `POST /api/v1/admin/red/lineas/:id/recorridos` | Crea un recorrido: `sentido`, `dias_funcionamiento`, `horarios`, `paraderos` (ids en orden). |
+| `GET /api/v1/admin/red/recorridos/:id`         | Recorrido con paraderos y viajes en curso.                                                   |
+| `PUT /api/v1/admin/red/recorridos/:id`         | Edita días, horarios, `activo` o el orden de `paraderos`.                                    |
+| `GET /api/v1/admin/red/paraderos`              | Todos los paraderos con cuántos recorridos los usan.                                         |
+| `POST /api/v1/admin/red/paraderos`             | Crea: `codigo`, `nombre`, `latitud`, `longitud`.                                             |
+| `GET /api/v1/admin/red/paraderos/:id`          | Paradero con los recorridos que lo usan.                                                     |
+| `PUT /api/v1/admin/red/paraderos/:id`          | Edita, mueve o activa/desactiva.                                                             |
+
+- Los códigos de líneas y de paraderos no se repiten (sin distinguir mayúsculas): 409.
+- Un recorrido necesita al menos 2 paraderos activos, sin repetir; uno por sentido y línea.
+- Desactivar una línea, un recorrido o un paradero lo oculta de las consultas públicas e impide
+  usarlo en turnos y recorridos nuevos.
+- **Los cambios no alteran los viajes en curso:** mientras un recorrido tenga viajes en curso no
+  se cambian sus paraderos, y un paradero en uso no se mueve ni se desactiva (409, indicando
+  cuántos viajes hay). Días, horarios, nombres y colores se pueden cambiar siempre.
+
 ## Avisos de parada (VEH-02)
 
 `POST /conductor/viajes/:id/alertas-parada` devuelve `pendientes` (paraderos con solicitudes
@@ -518,7 +542,3 @@ ya se cerraron. La app lo consulta cada 5 segundos durante el viaje.
 
 `GET /viajes/:id/paraderos-disponibles` (pasajero) incluye `ubicacion_vehiculo` con la hora de la
 última posición e `informacion_atrasada` (VIA-03).
-
-## Pendiente
-
-- ADM-01 (gestión de líneas, recorridos y paraderos).

@@ -48,6 +48,17 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* ADM-01: gestión de líneas, recorridos y paraderos, solo para el administrador. */}
+      <Tabs.Screen
+        name="red"
+        options={{
+          title: 'Red',
+          href: esAdmin ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="git-network-outline" color={color as string} size={size} />
+          ),
+        }}
+      />
       {/* VEH-03: incidencias y estado de los vehículos, solo para el administrador. */}
       <Tabs.Screen
         name="flota"

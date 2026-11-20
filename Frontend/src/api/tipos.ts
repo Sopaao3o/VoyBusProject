@@ -441,3 +441,69 @@ export interface AlertasParada {
   nuevas: (ParaderoSolicitado & { nuevas: number })[];
   total_pendientes: number;
 }
+
+// ───── ADM-01: gestión de la red (administrador) ─────
+
+export type EstadoLinea = 'activa' | 'suspendida' | 'desactivada';
+
+export interface LineaAdmin {
+  id: number;
+  codigo: string;
+  nombre: string;
+  color: string;
+  estado_servicio: EstadoLinea;
+  recorridos: { id: number; sentido: Sentido; activo: boolean; total_paraderos: number }[];
+}
+
+export interface ParaderoDeRecorridoAdmin extends ParaderoDeRecorrido {
+  activo: boolean;
+}
+
+export interface RecorridoAdmin {
+  id: number;
+  linea_id: number;
+  sentido: Sentido;
+  dias_funcionamiento: string;
+  horarios: string;
+  activo: boolean;
+  viajes_en_curso: number;
+  paraderos: ParaderoDeRecorridoAdmin[];
+}
+
+export interface LineaAdminDetalle extends Omit<LineaAdmin, 'recorridos'> {
+  recorridos: RecorridoAdmin[];
+}
+
+export interface ParaderoAdmin extends Paradero {
+  activo: boolean;
+  total_recorridos: number;
+}
+
+export interface ParaderoAdminDetalle extends Paradero {
+  activo: boolean;
+  recorridos: { id: number; linea_codigo: string; sentido: Sentido; orden: number }[];
+  viajes_en_curso: number;
+}
+
+export interface LineaBody {
+  codigo: string;
+  nombre: string;
+  color: string;
+  estado_servicio?: EstadoLinea;
+}
+
+export interface RecorridoBody {
+  sentido: Sentido;
+  dias_funcionamiento: string;
+  horarios: string;
+  activo?: boolean;
+  paraderos: number[];
+}
+
+export interface ParaderoBody {
+  codigo: string;
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  activo?: boolean;
+}

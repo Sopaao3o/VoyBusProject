@@ -1,4 +1,4 @@
-import type { EstadoVehiculo, Puntualidad } from '../api/tipos';
+import type { EstadoLinea, EstadoVehiculo, Puntualidad } from '../api/tipos';
 
 export const ETIQUETA_ESTADO_VEHICULO: Record<EstadoVehiculo, string> = {
   operativo: 'Operativo',
@@ -44,4 +44,16 @@ export function textoHace(segundos: number) {
 export function textoParaderosAntes(paraderos: number) {
   if (paraderos === 0) return 'es su próximo paradero';
   return `a ${paraderos} ${paraderos === 1 ? 'paradero' : 'paraderos'}`;
+}
+
+/** ADM-01: estado de servicio de una línea. */
+export const ETIQUETA_ESTADO_LINEA: Record<EstadoLinea, string> = {
+  activa: 'Activa',
+  suspendida: 'Suspendida',
+  desactivada: 'Desactivada',
+};
+
+/** Minúsculas y sin tildes, para buscar sin importar cómo se escribe ("colon" encuentra "Colón"). */
+export function normalizarBusqueda(texto: string) {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 }

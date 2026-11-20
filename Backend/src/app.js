@@ -13,6 +13,9 @@ const { createGoogleOAuth } = require('./utils/google');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
+const { createRedAdminService } = require('./modules/red/red.admin.service');
+const { createRedAdminController } = require('./modules/red/red.admin.controller');
+const { createRedAdminRoutes } = require('./modules/red/red.admin.routes');
 const { createFavoritosService } = require('./modules/favoritos/favoritos.service');
 const { createFavoritosController } = require('./modules/favoritos/favoritos.controller');
 const { createFavoritosRoutes } = require('./modules/favoritos/favoritos.routes');
@@ -105,6 +108,11 @@ function createApp({
   const ubicacion = createUbicacionService(models, { ahora, permitirSimulacion: simulador });
   v1.use('/conductor', autenticar, createUbicacionRoutes(createUbicacionController(ubicacion)));
   v1.use('/admin', autenticar, createMonitoreoRoutes(circulacion));
+  v1.use(
+    '/admin/red',
+    autenticar,
+    createRedAdminRoutes(createRedAdminController(createRedAdminService(models))),
+  );
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
   v1.use(
