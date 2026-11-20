@@ -25,6 +25,7 @@ import {
   PanelTexto,
 } from '../../../src/components/PanelesConductor';
 import { useApi } from '../../../src/hooks/useApi';
+import { useAlertasParada } from '../../../src/session/AlertasParada';
 import { useGpsConductor, type ViajeGps } from '../../../src/session/GpsConductor';
 import { colors } from '../../../src/theme/colors';
 import { fechaHora, horaLocal, rangoHoras } from '../../../src/utils/fechas';
@@ -83,6 +84,7 @@ export default function TurnoConductorScreen() {
   const [panel, setPanel] = useState<Panel>(null);
   const [enviando, setEnviando] = useState(false);
   const gps = useGpsConductor();
+  const { pendientes } = useAlertasParada();
   // Solo en desarrollo: recorre el trayecto con posiciones simuladas en vez del GPS real.
   const [simular, setSimular] = useState(false);
   const modoGps = simular ? 'simulador' : 'gps';
@@ -339,7 +341,23 @@ export default function TurnoConductorScreen() {
             {v.estado === 'en_curso' && (
               <>
                 {gps.viajeId === v.id ? (
-                  <EstadoGps />
+                  <>
+                    <EstadoGps />
+                    {/* VEH-02: paradas pendientes, en el orden del recorrido. */}
+                    <View style={styles.paradas}>
+                      <Text style={styles.paradasTitulo}>Paradas solicitadas</Text>
+                      {pendientes.length === 0 ? (
+                        <Text style={styles.dato}>Ninguna por ahora.</Text>
+                      ) : (
+                        pendientes.map((p) => (
+                          <Text key={p.paradero.id} style={styles.parada}>
+                            {p.paradero.orden}. {p.paradero.nombre} · {p.total}{' '}
+                            {p.total === 1 ? 'solicitud' : 'solicitudes'}
+                          </Text>
+                        ))
+                      )}
+                    </View>
+                  </>
                 ) : (
                   <>
                     <Text style={styles.desviacion}>
@@ -411,6 +429,9 @@ const styles = StyleSheet.create({
   },
   viajeTitulo: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
   estadoViaje: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  paradas: { backgroundColor: colors.background, borderRadius: 12, padding: 12, gap: 4 },
+  paradasTitulo: { fontSize: 14, fontWeight: '700', color: colors.text },
+  parada: { fontSize: 15, fontWeight: '600', color: colors.accent },
   simulador: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -88,6 +88,13 @@ Cuentas de ejemplo (`npm run db:reset` en el backend), todas con la contraseña 
   una micro a la vez; el botón del inicio pasa a "Ver mi viaje". En el viaje está **Bajarme de
   esta micro**. El administrador ve el QR de cada micro en Flota → vehículo, para imprimirlo. En
   desarrollo, la pantalla ofrece los códigos de las micros en ruta (útil en el emulador).
+- **Avisos de parada (VEH-02):** durante el viaje, cuando un pasajero pide parada, el conductor
+  recibe una franja roja arriba de cualquier pantalla con vibración y sonido (`expo-audio`, con un
+  tono propio en `assets/sonidos/parada.wav`). No bloquea ni pide confirmación y se va sola. Una
+  nueva solicitud para el mismo paradero actualiza el contador; los avisos no se repiten, tampoco
+  al reconectarse. El turno muestra las paradas pendientes en orden del recorrido.
+- **Información atrasada (VIA-03):** si la micro deja de enviar su ubicación, el pasajero ve el
+  aviso con la hora de la última actualización y se conserva el último estado de su solicitud.
 - Los términos y la política de privacidad (`app/terminos.tsx`) son un borrador pendiente de
   aprobación del cliente.
 - La verificación en dos pasos usa una aplicación autenticadora (Google Authenticator, Authy...).
@@ -143,6 +150,7 @@ Frontend/
 | VEH-03    | Pestaña Mis turnos: iniciar/finalizar turno y viaje, estado, incidencias. Pestaña Flota (administrador): incidencias e historial de estados de cada vehículo |
 | RED-03    | Micros en vivo en el inicio, la línea (solo las de esa línea) y el paradero (las que se acercan)                                                             |
 | ADM-04    | Monitoreo del administrador: mapa con las micros y detalle de cada una                                                                                       |
+| VEH-02    | Aviso de parada al conductor (franja, vibración y sonido) y paradas pendientes en orden                                                                      |
 | VEH-01    | Turno del conductor: comparte el GPS durante el viaje y muestra señal, última hora y siguiente paradero                                                      |
 | ADM-03    | Pestaña Turnos: lista, creación, modificación y margen de tolerancia                                                                                         |
 

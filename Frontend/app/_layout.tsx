@@ -2,6 +2,8 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { AvisoParada } from '../src/components/AvisoParada';
+import { AlertasParadaProvider } from '../src/session/AlertasParada';
 import { GpsConductorProvider } from '../src/session/GpsConductor';
 import { UsuarioProvider, useUsuario } from '../src/session/UsuarioContext';
 import { colors } from '../src/theme/colors';
@@ -37,34 +39,38 @@ function Navegacion() {
   }, [cargando, usuario, primero, segundo, router]);
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.primary },
-        headerTintColor: colors.surface,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="cuenta" options={{ title: 'Tu cuenta' }} />
-      <Stack.Screen name="terminos" options={{ title: 'Términos y privacidad' }} />
-      <Stack.Screen name="viajar" options={{ title: 'Subir a una micro' }} />
-      <Stack.Screen name="login" options={{ title: 'Iniciar sesión' }} />
-      <Stack.Screen name="google" options={{ headerShown: false, animation: 'none' }} />
-      <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
-      <Stack.Screen name="verificar" options={{ title: 'Verificar cuenta' }} />
-      <Stack.Screen name="recuperar" options={{ title: 'Recuperar contraseña' }} />
-      <Stack.Screen name="cambiar-password" options={{ title: 'Cambiar contraseña' }} />
-      <Stack.Screen name="dos-factores" options={{ title: 'Verificación en dos pasos' }} />
-      {/* Pantallas con mapa: sin barra superior, con botón flotante para volver. */}
-      <Stack.Screen name="linea/[id]" options={{ title: 'Línea', headerShown: false }} />
-      <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero', headerShown: false }} />
-      <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
-      <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
-      <Stack.Screen name="vehiculo/[id]" options={{ title: 'Vehículo' }} />
-      <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
-      <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
-      <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />
-    </Stack>
+    <>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.primary },
+          headerTintColor: colors.surface,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="cuenta" options={{ title: 'Tu cuenta' }} />
+        <Stack.Screen name="terminos" options={{ title: 'Términos y privacidad' }} />
+        <Stack.Screen name="viajar" options={{ title: 'Subir a una micro' }} />
+        <Stack.Screen name="login" options={{ title: 'Iniciar sesión' }} />
+        <Stack.Screen name="google" options={{ headerShown: false, animation: 'none' }} />
+        <Stack.Screen name="registro" options={{ title: 'Crear cuenta' }} />
+        <Stack.Screen name="verificar" options={{ title: 'Verificar cuenta' }} />
+        <Stack.Screen name="recuperar" options={{ title: 'Recuperar contraseña' }} />
+        <Stack.Screen name="cambiar-password" options={{ title: 'Cambiar contraseña' }} />
+        <Stack.Screen name="dos-factores" options={{ title: 'Verificación en dos pasos' }} />
+        {/* Pantallas con mapa: sin barra superior, con botón flotante para volver. */}
+        <Stack.Screen name="linea/[id]" options={{ title: 'Línea', headerShown: false }} />
+        <Stack.Screen name="paradero/[id]" options={{ title: 'Paradero', headerShown: false }} />
+        <Stack.Screen name="turno/[id]" options={{ title: 'Turno' }} />
+        <Stack.Screen name="turno/formulario" options={{ title: 'Turno' }} />
+        <Stack.Screen name="vehiculo/[id]" options={{ title: 'Vehículo' }} />
+        <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
+        <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
+        <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />
+      </Stack>
+      {/* VEH-02: aviso de parada para el conductor, sobre cualquier pantalla. */}
+      <AvisoParada />
+    </>
   );
 }
 
@@ -72,8 +78,10 @@ export default function RootLayout() {
   return (
     <UsuarioProvider>
       <GpsConductorProvider>
-        <StatusBar style="light" />
-        <Navegacion />
+        <AlertasParadaProvider>
+          <StatusBar style="light" />
+          <Navegacion />
+        </AlertasParadaProvider>
       </GpsConductorProvider>
     </UsuarioProvider>
   );

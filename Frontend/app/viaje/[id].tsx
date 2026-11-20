@@ -10,6 +10,7 @@ import { Cargando, ErrorMensaje, Vacio } from '../../src/components/Estados';
 import { Boton } from '../../src/components/Formulario';
 import { useApi } from '../../src/hooks/useApi';
 import { colors } from '../../src/theme/colors';
+import { horaConSegundos } from '../../src/components/mapa/FichaVehiculo';
 import { horaLocal } from '../../src/utils/fechas';
 
 const SEGUNDOS_ENTRE_ACTUALIZACIONES = 4;
@@ -74,7 +75,7 @@ export default function ViajeScreen() {
   if (error && !datos) return <ErrorMensaje mensaje={error} onReintentar={recargar} />;
   if (!datos) return null;
 
-  const { viaje, paraderos, mi_solicitud: solicitud } = datos;
+  const { viaje, paraderos, mi_solicitud: solicitud, ubicacion_vehiculo: ubicacion } = datos;
   const abierta = solicitud !== null && solicitud.estado !== 'cerrada';
   const destino = paraderos.find((p) => p.id === elegido) ?? null;
 
@@ -140,6 +141,18 @@ export default function ViajeScreen() {
         </Text>
         <Text style={styles.dato}>{viaje.linea_nombre}</Text>
       </View>
+
+      {/* VIA-03: sin ubicación reciente se mantiene el último estado conocido, avisando. */}
+      {ubicacion.informacion_atrasada && (
+        <View style={styles.atrasada} accessibilityRole="alert">
+          <Text style={styles.atrasadaTitulo}>Información atrasada</Text>
+          <Text style={styles.atrasadaTexto}>
+            {ubicacion.registrado_en
+              ? `La micro no envía su ubicación desde las ${horaConSegundos(ubicacion.registrado_en)}. Se muestra el último estado conocido.`
+              : 'La micro todavía no envía su ubicación. El estado se actualizará cuando llegue.'}
+          </Text>
+        </View>
+      )}
 
       {solicitud && (
         <View style={[styles.solicitud, { borderColor: presentar(solicitud).color }]}>
@@ -217,6 +230,9 @@ export default function ViajeScreen() {
 
 const styles = StyleSheet.create({
   contenido: { padding: 16, gap: 12, paddingBottom: 40 },
+  atrasada: { backgroundColor: colors.warningBg, borderRadius: 12, padding: 12, gap: 2 },
+  atrasadaTitulo: { color: colors.warning, fontWeight: '800', fontSize: 15 },
+  atrasadaTexto: { color: colors.warning, fontSize: 14 },
   fin: { flex: 1, padding: 24, justifyContent: 'center', gap: 12 },
   tarjeta: {
     backgroundColor: colors.surface,

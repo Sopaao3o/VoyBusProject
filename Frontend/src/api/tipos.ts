@@ -182,6 +182,12 @@ export interface SolicitudParada {
 }
 
 export interface ParaderosDisponibles {
+  /** VIA-03: hora de la última ubicación de la micro y si la información está atrasada. */
+  ubicacion_vehiculo: {
+    registrado_en: string | null;
+    segundos_desde_actualizacion: number | null;
+    informacion_atrasada: boolean;
+  };
   viaje: {
     id: number;
     estado: string;
@@ -419,4 +425,19 @@ export interface MicroParaVincular {
 export interface Vinculacion extends MicroParaVincular {
   id: number;
   creada_en: string;
+}
+
+// ───── VEH-02: avisos de parada para el conductor ─────
+
+export interface ParaderoSolicitado {
+  paradero: { id: number; codigo: string; nombre: string; orden: number };
+  total: number;
+}
+
+export interface AlertasParada {
+  /** Paraderos con solicitudes pendientes, en el orden del recorrido. */
+  pendientes: ParaderoSolicitado[];
+  /** Solicitudes que todavía no se le habían avisado (no se repiten). */
+  nuevas: (ParaderoSolicitado & { nuevas: number })[];
+  total_pendientes: number;
 }

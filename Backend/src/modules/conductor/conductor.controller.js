@@ -43,6 +43,9 @@ function createConductorController(service) {
       const historial = await service.historialVehiculo(req.datos.params.id);
       res.json({ data: historial, meta: { total: historial.length } });
     },
+    alertasDeParada: async (req, res) => {
+      res.json({ data: await service.alertasDeParada(yo(req), req.datos.params.id) });
+    },
     solicitudesDeParada: async (req, res) => {
       const grupos = await service.solicitudesDeParada(yo(req), req.datos.params.id);
       res.json({

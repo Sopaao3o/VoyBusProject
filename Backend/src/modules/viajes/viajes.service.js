@@ -2,6 +2,7 @@
 const { Op, UniqueConstraintError } = require('sequelize');
 const { notFound, conflict, badRequest, HttpError } = require('../../utils/httpErrors');
 const { actualizarSolicitudes } = require('./solicitudes');
+const { UMBRAL_ATRASADA_S } = require('../ubicacion/circulacion.service');
 
 const TEXTO_CIERRE = {
   paradero_superado: 'El vehículo ya superó tu paradero',
@@ -116,7 +117,22 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
           order: [['orden', 'ASC']],
           transaction,
         });
+        // VIA-03: si la micro dejó de enviar su ubicación, se conserva el último estado
+        // conocido y se avisa que la información puede estar atrasada.
+        const ubicacion = await UbicacionVehiculo.findOne({
+          where: { viaje_id: viaje.id },
+          order: [['id', 'DESC']],
+          transaction,
+        });
+        const segundos = ubicacion
+          ? Math.round((ahora() - new Date(ubicacion.registrado_en)) / 1000)
+          : null;
         return {
+          ubicacion_vehiculo: {
+            registrado_en: ubicacion?.registrado_en ?? null,
+            segundos_desde_actualizacion: segundos,
+            informacion_atrasada: segundos === null || segundos > UMBRAL_ATRASADA_S,
+          },
           viaje: {
             id: viaje.id,
             estado: viaje.estado,

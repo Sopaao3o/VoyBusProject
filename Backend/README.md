@@ -397,21 +397,22 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 
 ### Turnos y vehículo (VEH-03) · conductor
 
-| Método y ruta                                         | Descripción                                                     |
-| ----------------------------------------------------- | --------------------------------------------------------------- |
-| `GET /api/v1/conductor/turnos`                        | Mis turnos con vehículo y recorridos.                           |
-| `GET /api/v1/conductor/turnos/:id`                    | Detalle de uno de mis turnos.                                   |
-| `POST /api/v1/conductor/turnos/:id/iniciar`           | Inicia el turno y registra el estado del vehículo.              |
-| `POST /api/v1/conductor/turnos/:id/finalizar`         | Finaliza el turno y registra el estado del vehículo.            |
-| `POST /api/v1/conductor/turnos/:id/estado-vehiculo`   | Cambia el estado del vehículo (con observación si corresponde). |
-| `POST /api/v1/conductor/turnos/:id/incidencias`       | Registra una incidencia del vehículo o del recorrido.           |
-| `PUT /api/v1/conductor/turnos/:id/justificacion`      | Justifica atraso o término anticipado del turno.                |
-| `POST /api/v1/conductor/viajes/:id/iniciar`           | Inicia un viaje (en orden y con el turno en curso).             |
-| `POST /api/v1/conductor/viajes/:id/finalizar`         | Finaliza el viaje y cierra sus solicitudes de parada.           |
-| `GET /api/v1/conductor/viajes/:id/solicitudes-parada` | Solicitudes abiertas agrupadas por paradero, en orden.          |
-| `PUT /api/v1/conductor/viajes/:id/justificacion`      | Justifica atraso o término anticipado del viaje.                |
-| `GET /api/v1/admin/incidencias`                       | (administrador) Incidencias registradas por los conductores.    |
-| `GET /api/v1/admin/vehiculos/:id/historial`           | (administrador) Historial de estados de un vehículo.            |
+| Método y ruta                                         | Descripción                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /api/v1/conductor/turnos`                        | Mis turnos con vehículo y recorridos.                                 |
+| `GET /api/v1/conductor/turnos/:id`                    | Detalle de uno de mis turnos.                                         |
+| `POST /api/v1/conductor/turnos/:id/iniciar`           | Inicia el turno y registra el estado del vehículo.                    |
+| `POST /api/v1/conductor/turnos/:id/finalizar`         | Finaliza el turno y registra el estado del vehículo.                  |
+| `POST /api/v1/conductor/turnos/:id/estado-vehiculo`   | Cambia el estado del vehículo (con observación si corresponde).       |
+| `POST /api/v1/conductor/turnos/:id/incidencias`       | Registra una incidencia del vehículo o del recorrido.                 |
+| `PUT /api/v1/conductor/turnos/:id/justificacion`      | Justifica atraso o término anticipado del turno.                      |
+| `POST /api/v1/conductor/viajes/:id/iniciar`           | Inicia un viaje (en orden y con el turno en curso).                   |
+| `POST /api/v1/conductor/viajes/:id/finalizar`         | Finaliza el viaje y cierra sus solicitudes de parada.                 |
+| `GET /api/v1/conductor/viajes/:id/solicitudes-parada` | Solicitudes abiertas agrupadas por paradero, en orden.                |
+| `POST /api/v1/conductor/viajes/:id/alertas-parada`    | (VEH-02) Pendientes por paradero y las solicitudes nuevas sin avisar. |
+| `PUT /api/v1/conductor/viajes/:id/justificacion`      | Justifica atraso o término anticipado del viaje.                      |
+| `GET /api/v1/admin/incidencias`                       | (administrador) Incidencias registradas por los conductores.          |
+| `GET /api/v1/admin/vehiculos/:id/historial`           | (administrador) Historial de estados de un vehículo.                  |
 
 ### Vinculación con un vehículo (VIA-01) · pasajero (registrado o invitado)
 
@@ -507,6 +508,17 @@ quedado de una simulación anterior.
 - Cambios de esquema: crear una migración nueva en `src/database/migrations/`
   (no editar las ya aplicadas).
 
+## Avisos de parada (VEH-02)
+
+`POST /conductor/viajes/:id/alertas-parada` devuelve `pendientes` (paraderos con solicitudes
+abiertas, en orden del recorrido, con su total) y `nuevas` (las que todavía no se le habían
+avisado al conductor, que quedan marcadas en `solicitudes_parada.avisada_en`). Así un aviso nunca
+se repite, tampoco al reconectarse, y los paraderos superados no aparecen porque sus solicitudes
+ya se cerraron. La app lo consulta cada 5 segundos durante el viaje.
+
+`GET /viajes/:id/paraderos-disponibles` (pasajero) incluye `ubicacion_vehiculo` con la hora de la
+última posición e `informacion_atrasada` (VIA-03).
+
 ## Pendiente
 
-- VEH-02 (aviso de parada con sonido para el conductor) y ADM-01 (gestión de la red).
+- ADM-01 (gestión de líneas, recorridos y paraderos).

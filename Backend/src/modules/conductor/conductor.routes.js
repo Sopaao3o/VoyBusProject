@@ -52,6 +52,8 @@ function createConductorRoutes(c) {
   router.post('/viajes/:id/iniciar', soloConductor, params, c.iniciarViaje);
   router.post('/viajes/:id/finalizar', soloConductor, params, c.finalizarViaje);
   router.get('/viajes/:id/solicitudes-parada', soloConductor, params, c.solicitudesDeParada);
+  // VEH-02: POST porque marca como avisadas las solicitudes nuevas que devuelve.
+  router.post('/viajes/:id/alertas-parada', soloConductor, params, c.alertasDeParada);
   router.put(
     '/viajes/:id/justificacion',
     soloConductor,
