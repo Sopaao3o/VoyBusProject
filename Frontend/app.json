@@ -21,7 +21,8 @@
           "cameraPermission": "VoyBus usa la cámara para leer el código QR de la micro en que vas.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "ios": {
       "supportsTablet": true
