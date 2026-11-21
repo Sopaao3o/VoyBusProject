@@ -80,7 +80,7 @@ export default function RegistroScreen() {
 
   function usarSesion(usuario: UsuarioSesion, token: string) {
     iniciarSesion({ usuario, token });
-    router.dismissTo('/usuario');
+    router.dismissTo('/');
   }
 
   async function registrarse() {
@@ -152,8 +152,15 @@ export default function RegistroScreen() {
 
       <BotonGoogle onResultado={usarRespuestaGoogle} onError={setError} deshabilitado={enviando} />
       <Text style={styles.legal}>
-        Al continuar con Google aceptas la política de privacidad y los términos de uso de VoyBus.
-        Tu correo queda verificado por Google.
+        Al continuar con Google aceptas la{' '}
+        <Text
+          style={styles.enlace}
+          onPress={() => router.push('/terminos')}
+          accessibilityRole="link"
+        >
+          política de privacidad y los términos de uso
+        </Text>{' '}
+        de VoyBus. Tu correo queda verificado por Google.
       </Text>
       <Text style={styles.oCorreo}>o crea tu cuenta con correo o teléfono</Text>
 
@@ -227,6 +234,9 @@ export default function RegistroScreen() {
           Acepto la política de privacidad y los términos de uso de VoyBus.
         </Text>
       </Pressable>
+      <Text style={styles.leer} onPress={() => router.push('/terminos')} accessibilityRole="link">
+        Leer los términos y la política de privacidad
+      </Text>
 
       <CajaError mensaje={error} />
 
@@ -267,7 +277,9 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   terminosTexto: { flex: 1, fontSize: 14, color: colors.text },
+  leer: { color: colors.primary, fontWeight: '600', fontSize: 14, marginTop: -6 },
   separador: { height: 1, backgroundColor: colors.border, marginVertical: 6 },
+  enlace: { color: colors.primary, fontWeight: '600' },
   legal: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
   oCorreo: { textAlign: 'center', color: colors.textMuted, marginTop: 4 },
   invitadoTitulo: { fontSize: 16, fontWeight: '700', color: colors.text },

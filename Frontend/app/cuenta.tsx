@@ -2,9 +2,9 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Boton } from '../../src/components/Formulario';
-import { useUsuario } from '../../src/session/UsuarioContext';
-import { colors } from '../../src/theme/colors';
+import { Boton } from '../src/components/Formulario';
+import { useUsuario } from '../src/session/UsuarioContext';
+import { colors } from '../src/theme/colors';
 
 const ROL: Record<string, string> = {
   pasajero: 'Pasajero',
@@ -12,7 +12,7 @@ const ROL: Record<string, string> = {
   administrador: 'Administrador',
 };
 
-// Pestaña Cuenta: iniciar sesión o crear cuenta (ACC-01, ACC-02) y, con sesión iniciada,
+// Cuenta (se abre desde el botón redondo del mapa): iniciar sesión o crear cuenta (ACC-01, ACC-02) y, con sesión iniciada,
 // seguridad de la cuenta (2FA, contraseña) y cierre de sesión (ACC-03).
 export default function CuentaScreen() {
   const router = useRouter();
@@ -33,6 +33,11 @@ export default function CuentaScreen() {
           variante="secundario"
           onPress={() => router.push('/registro')}
         />
+        <Boton
+          titulo="Términos y privacidad"
+          variante="secundario"
+          onPress={() => router.push('/terminos')}
+        />
       </ScrollView>
     );
   }
@@ -50,7 +55,7 @@ export default function CuentaScreen() {
           await cerrarSesion();
           setCerrando(false);
           // ACC-03: tras salir, la app vuelve a la pantalla de acceso.
-          router.push('/login');
+          router.replace('/login');
         },
       },
     ]);
@@ -97,6 +102,11 @@ export default function CuentaScreen() {
         </>
       )}
 
+      <Boton
+        titulo="Términos y privacidad"
+        variante="secundario"
+        onPress={() => router.push('/terminos')}
+      />
       <Boton
         titulo={cerrando ? 'Cerrando sesión…' : 'Cerrar sesión'}
         variante="peligro"

@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "db:migrar": "node src/database/run.js",
     "db:reset": "node src/database/run.js --reset",
+    "catalogo:antofagasta": "node scripts/antofagasta/generar.js",
     "test": "node --test \"test/*.test.js\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -21,7 +22,8 @@
   "nodemonConfig": {
     "ignore": [
       "data/**",
-      "test/**"
+      "test/**",
+      "src/database/seeders/*.json"
     ]
   },
   "dependencies": {

@@ -7,7 +7,23 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "voybus",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VoyBus usa tu ubicación para centrar el mapa donde estás."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "VoyBus usa la cámara para leer el código QR de la micro en que vas.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-audio"
+    ],
     "ios": {
       "supportsTablet": true
     },

@@ -1,5 +1,6 @@
 require('./config/zod');
 const express = require('express');
+const { HttpError } = require('./utils/httpErrors');
 const cors = require('cors');
 const morgan = require('morgan');
 
@@ -13,6 +14,11 @@ const { createGoogleOAuth } = require('./utils/google');
 const { createRedService } = require('./modules/red/red.service');
 const { createRedController } = require('./modules/red/red.controller');
 const { createRedRoutes } = require('./modules/red/red.routes');
+const { createRedAdminService } = require('./modules/red/red.admin.service');
+const { createRedAdminController } = require('./modules/red/red.admin.controller');
+const { createRedAdminRoutes } = require('./modules/red/red.admin.routes');
+const { createImportacionRed } = require('./modules/red/antofagasta/importacion');
+const { catalogoPrueba } = require('./database/seeders/datos-ejemplo');
 const { createFavoritosService } = require('./modules/favoritos/favoritos.service');
 const { createFavoritosController } = require('./modules/favoritos/favoritos.controller');
 const { createFavoritosRoutes } = require('./modules/favoritos/favoritos.routes');
@@ -28,16 +34,40 @@ const {
 const { createViajesService } = require('./modules/viajes/viajes.service');
 const { createViajesController } = require('./modules/viajes/viajes.controller');
 const { createViajesRoutes, createSimuladorRoutes } = require('./modules/viajes/viajes.routes');
+const { createUbicacionService } = require('./modules/ubicacion/ubicacion.service');
+const {
+  createUbicacionController,
+  createCirculacionController,
+  createSimuladorFlotaController,
+} = require('./modules/ubicacion/ubicacion.controller');
+const {
+  createUbicacionRoutes,
+  createCirculacionRoutes,
+  createMonitoreoRoutes,
+  createSimuladorFlotaRoutes,
+} = require('./modules/ubicacion/ubicacion.routes');
+const { createCirculacionService } = require('./modules/ubicacion/circulacion.service');
+const { createSimuladorFlota } = require('./modules/ubicacion/simulador-flota');
+const { createVinculacionService } = require('./modules/vinculacion/vinculacion.service');
+const { createVinculacionController } = require('./modules/vinculacion/vinculacion.controller');
+const { createVinculacionRoutes } = require('./modules/vinculacion/vinculacion.routes');
 
 /**
  * @param {object} deps
  * @param {ReturnType<import('./database/models').initModels>} deps.models modelos Sequelize
  * @param {boolean} [deps.registro] mostrar cada petición en la consola
  * @param {() => Date} [deps.ahora] reloj (las pruebas lo reemplazan para controlar la hora)
- * @param {boolean} [deps.simulador] activa las rutas del simulador de posiciones (solo desarrollo)
+ * @param {boolean} [deps.simulador] activa el simulador de posiciones: sus rutas y el envío de
+ *   posiciones simuladas desde la app del conductor (solo desarrollo)
  * @param {boolean} [deps.exponerCodigoVerificacion] devuelve el código de ACC-01 en la respuesta (solo desarrollo)
  * @param {boolean} [deps.exponerTokenRecuperacion] devuelve el enlace de ACC-04 en la respuesta (solo desarrollo)
  * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
+ * @param {ReturnType<typeof createSimuladorFlota>} [deps.flota] simulador de flota (si se omite y
+ *   el simulador está activo, se crea uno)
+ * @param {typeof import('./modules/red/trazado').trazarPorCalles} [deps.trazador] genera trazados
+ *   por las calles (las pruebas lo reemplazan para no depender de internet)
+ * @param {ReturnType<typeof createImportacionRed>} [deps.importacionRed] cambio de toda la red
+ *   desde la app (las pruebas lo crean con fuentes falsas)
  */
 function createApp({
   models,
@@ -47,6 +77,9 @@ function createApp({
   exponerCodigoVerificacion = process.env.NODE_ENV !== 'production',
   exponerTokenRecuperacion = exponerCodigoVerificacion,
   google = createGoogleOAuth(),
+  flota,
+  trazador,
+  importacionRed,
 }) {
   const app = express();
 
@@ -66,6 +99,8 @@ function createApp({
   const v1 = express.Router();
   const autenticar = crearAutenticacion({ models });
   v1.use('/auth', createAuthRoutes(auth, { autenticar }));
+  const circulacion = createCirculacionController(createCirculacionService(models, { ahora }));
+  v1.use(createCirculacionRoutes(circulacion)); // antes que /paraderos/:id de la red
   v1.use(createRedRoutes(createRedController(createRedService(models))));
   v1.use(
     '/favoritos',
@@ -79,9 +114,38 @@ function createApp({
   );
   v1.use('/admin', autenticar, createConductorAdminRoutes(conductor));
   v1.use('/conductor', autenticar, createConductorRoutes(conductor));
+  const ubicacion = createUbicacionService(models, { ahora, permitirSimulacion: simulador });
+  v1.use('/conductor', autenticar, createUbicacionRoutes(createUbicacionController(ubicacion)));
+  v1.use('/admin', autenticar, createMonitoreoRoutes(circulacion));
+  v1.use(
+    '/admin/red',
+    autenticar,
+    createRedAdminRoutes(
+      createRedAdminController(
+        createRedAdminService(models, {
+          ...(trazador ? { trazador } : {}),
+          ...(ahora ? { ahora } : {}),
+        }),
+        importacionRed ??
+          createImportacionRed(models, { ...(ahora ? { ahora } : {}), catalogoPrueba }),
+      ),
+    ),
+  );
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
-  if (simulador) v1.use('/simulador', createSimuladorRoutes(viajes));
+  v1.use(
+    '/vinculacion',
+    autenticar,
+    createVinculacionRoutes(
+      createVinculacionController(createVinculacionService(models, { ahora })),
+    ),
+  );
+  if (simulador) {
+    v1.use('/simulador', createSimuladorRoutes(viajes));
+    flota ??= createSimuladorFlota(models, ubicacion, { ahora });
+    v1.use('/simulador', createSimuladorFlotaRoutes(createSimuladorFlotaController(flota)));
+    app.locals.flota = flota; // server.js lo limpia al arrancar y puede iniciarlo solo
+  }
   app.use('/api/v1', v1);
 
   app.use((req, res) => {
@@ -96,7 +160,8 @@ function createApp({
       code = 'JSON_INVALIDO';
       message = 'El cuerpo de la petición no es un JSON válido';
     }
-    if (!status || status >= 500) {
+    // Un HttpError 5xx es intencional (por ejemplo, 503 si un servicio externo no responde).
+    if (!status || (status >= 500 && !(err instanceof HttpError))) {
       console.error(err);
       status = 500;
       code = 'ERROR_INTERNO';

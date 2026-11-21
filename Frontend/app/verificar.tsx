@@ -38,7 +38,7 @@ export default function VerificarScreen() {
     try {
       const sesion = await verificarContacto({ codigo: codigo.trim(), ...cuerpoContacto });
       iniciarSesion(sesion);
-      router.dismissTo('/usuario');
+      router.dismissTo('/');
     } catch (e) {
       setError(textoDeError(e));
     } finally {

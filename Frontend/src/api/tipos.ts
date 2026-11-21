@@ -32,7 +32,12 @@ export interface Recorrido {
   dias_funcionamiento: string;
   horarios: string;
   paraderos: ParaderoDeRecorrido[];
+  /** Camino por las calles, puntos [latitud, longitud]. null = tramos rectos entre paraderos. */
+  trazado?: Trazado | null;
 }
+
+/** Puntos [latitud, longitud] de un recorrido por las calles. */
+export type Trazado = [number, number][];
 
 export interface LineaDetalle extends Linea {
   recorridos: Recorrido[];
@@ -168,15 +173,6 @@ export interface GrupoSolicitudes {
 
 // ───── VIA-02: pasajero ─────
 
-export interface ViajeEnCurso {
-  id: number;
-  linea_codigo: string;
-  linea_nombre: string;
-  sentido: 'ida' | 'vuelta';
-  vehiculo_identificador: string;
-  ultimo_orden_superado: number;
-}
-
 export type EstadoSolicitud = 'enviada' | 'proxima' | 'cerrada';
 
 export interface SolicitudParada {
@@ -191,6 +187,15 @@ export interface SolicitudParada {
 }
 
 export interface ParaderosDisponibles {
+  /** VIA-03: hora de la última ubicación de la micro y si la información está atrasada. */
+  ubicacion_vehiculo: {
+    /** Última posición conocida de la micro (null si todavía no envía). */
+    latitud: number | null;
+    longitud: number | null;
+    registrado_en: string | null;
+    segundos_desde_actualizacion: number | null;
+    informacion_atrasada: boolean;
+  };
   viaje: {
     id: number;
     estado: string;
@@ -198,7 +203,15 @@ export interface ParaderosDisponibles {
     linea_codigo: string;
     linea_nombre: string;
     ultimo_orden_superado: number;
+    linea_color: string;
   };
+  /** Todo el recorrido, para el mapa. */
+  recorrido: {
+    id: number;
+    paraderos: (ParaderoDeRecorrido & { superado: boolean })[];
+    trazado: Trazado | null;
+  };
+  /** Los paraderos que faltan (donde todavía se puede pedir parada). */
   paraderos: ParaderoDeRecorrido[];
   mi_solicitud: SolicitudParada | null;
 }
@@ -331,4 +344,215 @@ export interface CambioEstadoVehiculo {
   estado_nuevo: string;
   motivo: string | null;
   fecha: string;
+}
+
+// ───── VEH-01: ubicación del vehículo ─────
+
+export type OrigenUbicacion = 'gps' | 'simulador';
+
+export interface UbicacionBody {
+  latitud: number;
+  longitud: number;
+  precision_m?: number;
+  origen?: OrigenUbicacion;
+}
+
+/** Lo que responde el servidor a cada posición: hasta dónde llegó el vehículo. */
+export interface AvanceViaje {
+  viaje_id: number;
+  registrado_en: string;
+  origen: OrigenUbicacion;
+  ultimo_orden_superado: number;
+  siguiente_paradero: ParaderoDeRecorrido | null;
+  precision_insuficiente: boolean;
+  fuera_de_recorrido: boolean;
+  solicitudes_cerradas: number;
+}
+
+// ───── RED-03 y ADM-04: vehículos en circulación ─────
+
+export interface VehiculoCirculacion {
+  viaje_id: number;
+  vehiculo: { id: number; identificador: string };
+  linea: { id: number; codigo: string; nombre: string; color: string };
+  recorrido: { id: number; sentido: Sentido; destino: string | null };
+  ultima_ubicacion: { latitud: number; longitud: number; registrado_en: string } | null;
+  segundos_desde_actualizacion: number | null;
+  /** Más de 30 s sin datos: se muestra la última posición conocida, avisando que está atrasada. */
+  ubicacion_atrasada: boolean;
+  ultimo_orden_superado: number;
+  siguiente_paradero: ParaderoDeRecorrido | null;
+}
+
+/** Una micro que se dirige a un paradero. */
+export interface MicroProxima extends VehiculoCirculacion {
+  /** Paraderos que le faltan antes de llegar (0 = este es su próximo paradero). */
+  paraderos_antes: number;
+  distancia_m: number | null;
+}
+
+export interface ParaderoCercano extends Paradero {
+  distancia_m: number;
+}
+
+export interface VehiculoMonitoreo extends VehiculoCirculacion {
+  conductor: { id: number; nombre: string };
+  turno: {
+    id: number;
+    estado: EstadoTurno;
+    inicio_planificado: string;
+    termino_planificado: string;
+    inicio_real: string | null;
+  };
+  estado_vehiculo: EstadoVehiculo;
+  solicitudes_pendientes: {
+    paradero: { id: number; codigo: string; nombre: string; orden: number };
+    total: number;
+  }[];
+  incidencias: { id: number; tipo: 'vehiculo' | 'recorrido'; descripcion: string; fecha: string }[];
+}
+
+export interface Monitoreo {
+  resumen: {
+    en_circulacion: number;
+    con_ubicacion_atrasada: number;
+    con_incidencias: number;
+    solicitudes_pendientes: number;
+  };
+  vehiculos: VehiculoMonitoreo[];
+}
+
+export interface EstadoFlotaSimulada {
+  activa: boolean;
+  vehiculos: { identificador: string; linea: string; viaje_id: number; avance: number }[];
+}
+
+// ───── VIA-01: vinculación con un vehículo ─────
+
+/** La micro con su viaje en curso, tal como se muestra para confirmar. */
+export interface MicroParaVincular {
+  viaje_id: number;
+  vehiculo: { id: number; identificador: string };
+  linea: { id: number; codigo: string; nombre: string; color: string };
+  recorrido: { id: number; sentido: Sentido };
+  destino: string | null;
+}
+
+export interface Vinculacion extends MicroParaVincular {
+  id: number;
+  creada_en: string;
+}
+
+// ───── VEH-02: avisos de parada para el conductor ─────
+
+export interface ParaderoSolicitado {
+  paradero: { id: number; codigo: string; nombre: string; orden: number };
+  total: number;
+}
+
+export interface AlertasParada {
+  /** Paraderos con solicitudes pendientes, en el orden del recorrido. */
+  pendientes: ParaderoSolicitado[];
+  /** Solicitudes que todavía no se le habían avisado (no se repiten). */
+  nuevas: (ParaderoSolicitado & { nuevas: number })[];
+  total_pendientes: number;
+}
+
+// ───── ADM-01: gestión de la red (administrador) ─────
+
+export type EstadoLinea = 'activa' | 'suspendida' | 'desactivada';
+
+export interface LineaAdmin {
+  id: number;
+  codigo: string;
+  nombre: string;
+  color: string;
+  estado_servicio: EstadoLinea;
+  recorridos: { id: number; sentido: Sentido; activo: boolean; total_paraderos: number }[];
+}
+
+export interface ParaderoDeRecorridoAdmin extends ParaderoDeRecorrido {
+  activo: boolean;
+}
+
+export interface RecorridoAdmin {
+  id: number;
+  linea_id: number;
+  sentido: Sentido;
+  dias_funcionamiento: string;
+  horarios: string;
+  activo: boolean;
+  viajes_en_curso: number;
+  paraderos: ParaderoDeRecorridoAdmin[];
+  trazado: Trazado | null;
+  trazado_actualizado_en: string | null;
+}
+
+export interface LineaAdminDetalle extends Omit<LineaAdmin, 'recorridos'> {
+  recorridos: RecorridoAdmin[];
+}
+
+export interface ParaderoAdmin extends Paradero {
+  activo: boolean;
+  total_recorridos: number;
+}
+
+export interface ParaderoAdminDetalle extends Paradero {
+  activo: boolean;
+  recorridos: { id: number; linea_codigo: string; sentido: Sentido; orden: number }[];
+  viajes_en_curso: number;
+}
+
+export interface LineaBody {
+  codigo: string;
+  nombre: string;
+  color: string;
+  estado_servicio?: EstadoLinea;
+}
+
+export interface RecorridoBody {
+  sentido: Sentido;
+  dias_funcionamiento: string;
+  horarios: string;
+  activo?: boolean;
+  paraderos: number[];
+}
+
+export interface ParaderoBody {
+  codigo: string;
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  activo?: boolean;
+}
+
+// ───── ADM-01: cambiar toda la red (red real de Antofagasta o de prueba) ─────
+
+export interface ResultadoCambioRed {
+  lineas_creadas: number;
+  lineas_actualizadas: number;
+  lineas_desactivadas: number;
+  paraderos_creados: number;
+  paraderos_actualizados: number;
+  paraderos_desactivados: number;
+}
+
+export interface TareaGenerarRed {
+  estado: 'inactiva' | 'en_curso' | 'lista' | 'error';
+  fase?: 'descargando' | 'trazando' | 'aplicando' | 'lista';
+  mensaje?: string;
+  /** Recorridos trazados de `total`. */
+  hechos?: number;
+  total?: number;
+  avisos?: string[];
+  resultado?: ResultadoCambioRed;
+  iniciada_en?: string;
+  terminada_en?: string;
+}
+
+export interface EstadoRed {
+  red_actual: 'antofagasta' | 'prueba';
+  /** La red de Antofagasta ya generada, o null si todavía no se genera. */
+  archivo: { generado_en: string | null; lineas: string[]; total_paraderos: number } | null;
+  tarea: TareaGenerarRed;
 }

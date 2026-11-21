@@ -1,4 +1,4 @@
-import type { EstadoVehiculo, Puntualidad } from '../api/tipos';
+import type { EstadoLinea, EstadoVehiculo, Puntualidad } from '../api/tipos';
 
 export const ETIQUETA_ESTADO_VEHICULO: Record<EstadoVehiculo, string> = {
   operativo: 'Operativo',
@@ -26,3 +26,34 @@ export function textoPuntualidad(p: Puntualidad | null) {
 }
 
 export const hayDesviacion = (p: Puntualidad | null) => Boolean(p && p.estado !== 'a_tiempo');
+
+/** "350 m" o "1,2 km". */
+export function textoDistancia(metros: number) {
+  if (metros < 1000) return `${Math.round(metros / 10) * 10} m`;
+  return `${(metros / 1000).toFixed(1).replace('.', ',')} km`;
+}
+
+/** "hace 8 s", "hace 3 min". */
+export function textoHace(segundos: number) {
+  if (segundos < 60) return `hace ${segundos} s`;
+  const minutos = Math.floor(segundos / 60);
+  return minutos < 60 ? `hace ${minutos} min` : `hace ${Math.floor(minutos / 60)} h`;
+}
+
+/** "a 2 paraderos", "llega al siguiente paradero". */
+export function textoParaderosAntes(paraderos: number) {
+  if (paraderos === 0) return 'es su próximo paradero';
+  return `a ${paraderos} ${paraderos === 1 ? 'paradero' : 'paraderos'}`;
+}
+
+/** ADM-01: estado de servicio de una línea. */
+export const ETIQUETA_ESTADO_LINEA: Record<EstadoLinea, string> = {
+  activa: 'Activa',
+  suspendida: 'Suspendida',
+  desactivada: 'Desactivada',
+};
+
+/** Minúsculas y sin tildes, para buscar sin importar cómo se escribe ("colon" encuentra "Colón"). */
+export function normalizarBusqueda(texto: string) {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}

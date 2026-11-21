@@ -1,5 +1,14 @@
-// Datos de ejemplo de VoyBus (coordenadas aproximadas de Antofagasta, solo para demostración).
+// Datos de ejemplo de VoyBus. Hay dos catálogos de red:
+//  - "prueba": una red pequeña y fija (coordenadas aproximadas). La usan las pruebas automáticas.
+//  - "antofagasta": líneas reales de Antofagasta con su trazado por las calles, generadas con
+//    `npm run catalogo:antofagasta` (ver scripts/antofagasta). Si el archivo no existe, se usa
+//    el de prueba.
+// Los usuarios y vehículos de demostración son los mismos en ambos.
+const fs = require('node:fs');
+const path = require('node:path');
 const bcrypt = require('bcryptjs');
+
+const ARCHIVO_ANTOFAGASTA = path.join(__dirname, 'antofagasta.json');
 
 const PASSWORD_DEMO = 'Clave123!';
 
@@ -128,30 +137,67 @@ async function crearAdministradorInicial(Usuario, rondas) {
   });
 }
 
-/** Carga los datos de ejemplo. Pensado para una base recién migrada. */
+/** El catálogo de prueba en el mismo formato que el de Antofagasta. */
+function catalogoPrueba() {
+  return {
+    lineas: LINEAS.map((l) => {
+      const r = RECORRIDOS[l.codigo];
+      const base = { dias: r.dias, horarios: r.horarios, trazado: null };
+      return {
+        ...l,
+        recorridos: {
+          ida: { ...base, paraderos: r.ida },
+          vuelta: { ...base, paraderos: [...r.ida].reverse() },
+        },
+      };
+    }),
+    paraderos: PARADEROS,
+  };
+}
+
+/** El catálogo pedido ("prueba" o "antofagasta"). */
+function leerCatalogo(nombre) {
+  if (nombre !== 'antofagasta') return { nombre: 'prueba', ...catalogoPrueba() };
+  if (!fs.existsSync(ARCHIVO_ANTOFAGASTA)) {
+    console.warn(
+      'No existe src/database/seeders/antofagasta.json: se carga la red de prueba. Para generarlo: npm run catalogo:antofagasta',
+    );
+    return { nombre: 'prueba', ...catalogoPrueba() };
+  }
+  const datos = JSON.parse(fs.readFileSync(ARCHIVO_ANTOFAGASTA, 'utf8'));
+  return { nombre: 'antofagasta', lineas: datos.lineas, paraderos: datos.paraderos };
+}
+
+/**
+ * Carga los datos de ejemplo. Pensado para una base recién migrada.
+ * @param {{ usuariosDemo?: boolean, catalogo?: 'prueba' | 'antofagasta' }} [opciones]
+ * @returns {Promise<{ catalogo: string }>} el catálogo que se cargó
+ */
 async function cargarDatosEjemplo(
   { Usuario, Linea, Recorrido, Paradero, RecorridoParadero, Vehiculo },
-  { usuariosDemo = true } = {},
+  { usuariosDemo = true, catalogo = 'prueba' } = {},
 ) {
-  const lineaId = {};
-  for (const l of LINEAS) lineaId[l.codigo] = (await Linea.create(l)).id;
+  const red = leerCatalogo(catalogo);
+  const ahora = new Date().toISOString();
 
   const paraderoId = {};
-  for (const [codigo, nombre, latitud, longitud, activo = 1] of PARADEROS) {
+  for (const [codigo, nombre, latitud, longitud, activo = 1] of red.paraderos) {
     paraderoId[codigo] = (await Paradero.create({ codigo, nombre, latitud, longitud, activo })).id;
   }
 
-  for (const [codigo, r] of Object.entries(RECORRIDOS)) {
-    const sentidos = { ida: r.ida, vuelta: [...r.ida].reverse() };
-    for (const [sentido, paradas] of Object.entries(sentidos)) {
+  for (const { recorridos, ...datosLinea } of red.lineas) {
+    const linea = await Linea.create(datosLinea);
+    for (const [sentido, r] of Object.entries(recorridos)) {
       const recorrido = await Recorrido.create({
-        linea_id: lineaId[codigo],
+        linea_id: linea.id,
         sentido,
         dias_funcionamiento: r.dias,
         horarios: r.horarios,
+        trazado: r.trazado ? JSON.stringify(r.trazado) : null,
+        trazado_actualizado_en: r.trazado ? ahora : null,
       });
       await RecorridoParadero.bulkCreate(
-        paradas.map((p, i) => ({
+        r.paraderos.map((p, i) => ({
           recorrido_id: recorrido.id,
           orden: i + 1,
           paradero_id: paraderoId[p],
@@ -183,6 +229,7 @@ async function cargarDatosEjemplo(
       estado_operativo: ESTADOS_VEHICULO[i] || 'operativo',
     });
   }
+  return { catalogo: red.nombre };
 }
 
-module.exports = { cargarDatosEjemplo };
+module.exports = { cargarDatosEjemplo, catalogoPrueba, ARCHIVO_ANTOFAGASTA };

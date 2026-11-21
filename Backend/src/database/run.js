@@ -20,8 +20,10 @@ async function main() {
   const aplicadas = await createMigrator(sequelize).up();
   console.log(`Migraciones aplicadas: ${aplicadas.length}`);
   if (reset) {
-    await cargarDatosEjemplo(initModels(sequelize));
-    console.log('Datos de ejemplo cargados');
+    const { catalogo } = await cargarDatosEjemplo(initModels(sequelize), {
+      catalogo: process.env.CATALOGO || 'antofagasta',
+    });
+    console.log(`Datos de ejemplo cargados (red: ${catalogo})`);
   }
   await sequelize.close();
 }

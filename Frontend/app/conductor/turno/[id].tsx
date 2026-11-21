@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
   cambiarEstadoVehiculo,
@@ -14,7 +14,8 @@ import {
   registrarIncidencia,
 } from '../../../src/api/conductor';
 import { textoDeError } from '../../../src/api/client';
-import type { EstadoVehiculoBody, Puntualidad } from '../../../src/api/tipos';
+import type { EstadoVehiculoBody, Puntualidad, ViajeConductor } from '../../../src/api/tipos';
+import { EstadoGps } from '../../../src/components/EstadoGps';
 import { Cargando, ErrorMensaje } from '../../../src/components/Estados';
 import { InsigniaEstadoTurno } from '../../../src/components/EstadoTurno';
 import { Boton } from '../../../src/components/Formulario';
@@ -24,6 +25,8 @@ import {
   PanelTexto,
 } from '../../../src/components/PanelesConductor';
 import { useApi } from '../../../src/hooks/useApi';
+import { useAlertasParada } from '../../../src/session/AlertasParada';
+import { useGpsConductor, type ViajeGps } from '../../../src/session/GpsConductor';
 import { colors } from '../../../src/theme/colors';
 import { fechaHora, horaLocal, rangoHoras } from '../../../src/utils/fechas';
 import {
@@ -65,7 +68,14 @@ function Puntualidades({
   );
 }
 
+const datosGps = (v: ViajeConductor): ViajeGps => ({
+  viajeId: v.id,
+  lineaId: v.linea_id,
+  recorridoId: v.recorrido_id,
+});
+
 // VEH-03: un turno del conductor: iniciar/finalizar, viajes, estado del vehículo e incidencias.
+// VEH-01: al iniciar un viaje se comparte la ubicación del teléfono hasta finalizarlo.
 export default function TurnoConductorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -73,6 +83,18 @@ export default function TurnoConductorScreen() {
   const { datos: turno, cargando, error, recargar } = useApi(() => miTurno(turnoId), [turnoId]);
   const [panel, setPanel] = useState<Panel>(null);
   const [enviando, setEnviando] = useState(false);
+  const gps = useGpsConductor();
+  const { pendientes } = useAlertasParada();
+  // Solo en desarrollo: recorre el trayecto con posiciones simuladas en vez del GPS real.
+  const [simular, setSimular] = useState(false);
+  const modoGps = simular ? 'simulador' : 'gps';
+  const viajeEnCurso = turno?.viajes.find((v) => v.estado === 'en_curso') ?? null;
+  const reanudar = gps.reanudar;
+
+  // Si la app se cerró con un viaje en curso, al volver se sigue compartiendo la ubicación.
+  useEffect(() => {
+    if (viajeEnCurso) void reanudar(datosGps(viajeEnCurso), modoGps);
+  }, [viajeEnCurso, reanudar, modoGps]);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,8 +110,10 @@ export default function TurnoConductorScreen() {
       setPanel(null);
       await recargar();
       if (mensajeOk) Alert.alert('Listo', mensajeOk);
+      return true;
     } catch (e) {
       Alert.alert('No se pudo completar la acción', textoDeError(e));
+      return false;
     } finally {
       setEnviando(false);
     }
@@ -100,6 +124,38 @@ export default function TurnoConductorScreen() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Confirmar', onPress: accion },
     ]);
+
+  /** VEH-01: sin permiso de ubicación (o con el simulador apagado y sin GPS) no se inicia. */
+  async function empezarViaje(v: ViajeConductor) {
+    if (modoGps === 'gps' && !(await gps.asegurarPermiso())) return;
+    const iniciado = await ejecutar(async () => {
+      await iniciarViaje(v.id);
+      await gps.comenzar(datosGps(v), modoGps);
+    });
+    if (iniciado) abrirEnRuta(v);
+  }
+
+  /** La pantalla del viaje en ruta: mapa, próximo paradero y paradas solicitadas. */
+  function abrirEnRuta(v: ViajeConductor) {
+    router.push({
+      pathname: '/conductor/viaje/[id]',
+      params: { id: v.id, linea: v.linea_id, recorrido: v.recorrido_id, turno: turnoId },
+    });
+  }
+
+  async function compartirUbicacion(v: ViajeConductor) {
+    if (modoGps === 'gps' && !(await gps.asegurarPermiso())) return;
+    try {
+      await gps.comenzar(datosGps(v), modoGps);
+    } catch (e) {
+      Alert.alert('No se pudo compartir la ubicación', textoDeError(e));
+    }
+  }
+
+  function cambiarSimulacion(activa: boolean) {
+    setSimular(activa);
+    if (viajeEnCurso) void gps.comenzar(datosGps(viajeEnCurso), activa ? 'simulador' : 'gps');
+  }
 
   if (cargando && !turno) return <Cargando />;
   if (error || !turno) {
@@ -240,6 +296,21 @@ export default function TurnoConductorScreen() {
       )}
 
       <Text style={styles.subtitulo}>Viajes</Text>
+      {__DEV__ && enCurso && (
+        <View style={styles.simulador}>
+          <View style={styles.simuladorTextos}>
+            <Text style={styles.simuladorTitulo}>Simular recorrido (solo desarrollo)</Text>
+            <Text style={styles.dato}>
+              Envía posiciones falsas que avanzan por los paraderos, en vez del GPS real.
+            </Text>
+          </View>
+          <Switch
+            value={simular}
+            onValueChange={cambiarSimulacion}
+            accessibilityLabel="Simular recorrido"
+          />
+        </View>
+      )}
       {turno.viajes.map((v) => {
         const anterioresTerminados = turno.viajes
           .filter((o) => o.orden_en_turno < v.orden_en_turno)
@@ -274,17 +345,39 @@ export default function TurnoConductorScreen() {
             {puedeIniciar && (
               <Boton
                 titulo="Iniciar viaje"
-                onPress={() => ejecutar(() => iniciarViaje(v.id))}
+                onPress={() => empezarViaje(v)}
                 deshabilitado={enviando}
               />
             )}
             {v.estado === 'en_curso' && (
               <>
-                <Boton
-                  titulo="Ver solicitudes de parada"
-                  variante="secundario"
-                  onPress={() => router.push(`/conductor/viaje/${v.id}`)}
-                />
+                {gps.viajeId === v.id ? (
+                  <>
+                    <EstadoGps />
+                    {/* VEH-02: paradas pendientes, en el orden del recorrido. */}
+                    <View style={styles.paradas}>
+                      <Text style={styles.paradasTitulo}>Paradas solicitadas</Text>
+                      {pendientes.length === 0 ? (
+                        <Text style={styles.dato}>Ninguna por ahora.</Text>
+                      ) : (
+                        pendientes.map((p) => (
+                          <Text key={p.paradero.id} style={styles.parada}>
+                            {p.paradero.orden}. {p.paradero.nombre} · {p.total}{' '}
+                            {p.total === 1 ? 'solicitud' : 'solicitudes'}
+                          </Text>
+                        ))
+                      )}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.desviacion}>
+                      La ubicación de este viaje no se está compartiendo.
+                    </Text>
+                    <Boton titulo="Compartir ubicación" onPress={() => compartirUbicacion(v)} />
+                  </>
+                )}
+                <Boton titulo="Abrir el viaje en el mapa" onPress={() => abrirEnRuta(v)} />
                 <Boton
                   titulo="Finalizar viaje"
                   variante="peligro"
@@ -292,8 +385,12 @@ export default function TurnoConductorScreen() {
                   onPress={() =>
                     confirmar(
                       'Finalizar viaje',
-                      'Se cerrarán las solicitudes de parada abiertas.',
-                      () => ejecutar(() => finalizarViaje(v.id)),
+                      'Se cerrarán las solicitudes de parada abiertas y se dejará de compartir la ubicación.',
+                      () =>
+                        ejecutar(async () => {
+                          await finalizarViaje(v.id);
+                          if (gps.viajeId === v.id) gps.detener();
+                        }),
                     )
                   }
                 />
@@ -339,4 +436,17 @@ const styles = StyleSheet.create({
   },
   viajeTitulo: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text },
   estadoViaje: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  paradas: { backgroundColor: colors.background, borderRadius: 12, padding: 12, gap: 4 },
+  paradasTitulo: { fontSize: 14, fontWeight: '700', color: colors.text },
+  parada: { fontSize: 15, fontWeight: '600', color: colors.accent },
+  simulador: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.warningBg,
+    borderRadius: 12,
+    padding: 12,
+  },
+  simuladorTextos: { flex: 1, gap: 2 },
+  simuladorTitulo: { fontSize: 14, fontWeight: '700', color: colors.warning },
 });

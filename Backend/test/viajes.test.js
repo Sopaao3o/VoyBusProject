@@ -60,7 +60,22 @@ async function viajeEnCurso({ conductor = 2, vehiculo = 1, estado = 'en_curso' }
     inicio_planificado: `${dia}T08:30:00.000Z`,
     termino_planificado: `${dia}T10:00:00.000Z`,
   });
+  await vincular(viaje.id); // VIA-01: Ana va en esta micro
   return viaje.id;
+}
+
+/** VIA-01: vincula al pasajero con el viaje (termina antes cualquier otra vinculación suya). */
+async function vincular(viajeId, pasajero = 5) {
+  const pasajeroId = typeof pasajero === 'number' ? pasajero : pasajero.id;
+  await models.Vinculacion.update(
+    { terminada_en: new Date().toISOString(), motivo_termino: 'desvinculado' },
+    { where: { pasajero_id: pasajeroId, terminada_en: null } },
+  );
+  await models.Vinculacion.create({
+    pasajero_id: pasajeroId,
+    viaje_id: viajeId,
+    creada_en: new Date().toISOString(),
+  });
 }
 
 const solicitar = (viaje, paradero, as = 5) =>
@@ -188,6 +203,8 @@ test('VIA-02: las solicitudes de un mismo paradero se agrupan para el conductor 
     { rol: 'pasajero', nombre_visible: 'Pedro Invitado', tipo_acceso: 'invitado' },
     { rol: 'pasajero', nombre_visible: 'Sofía Rivas', alias: 'sofia' },
   ]);
+  await vincular(v, extra[0]);
+  await vincular(v, extra[1]);
   await solicitar(v, 7, 5);
   await solicitar(v, 7, extra[0]);
   await solicitar(v, 4, extra[1]);

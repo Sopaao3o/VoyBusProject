@@ -9,6 +9,7 @@ Todo el proyecto funciona sin servicios de pago: la base de datos es un archivo 
 cd Backend
 npm install
 cp .env.example .env        # en Windows (PowerShell): Copy-Item .env.example .env
+npm run catalogo:antofagasta   # una sola vez, con internet: genera las líneas reales (ver abajo)
 npm run db:reset            # crea la base con las migraciones y los datos de ejemplo
 npm run dev                 # reinicia solo al guardar cambios
 ```
@@ -17,16 +18,17 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 
 ## Scripts
 
-| Comando                | Qué hace                                                       |
-| ---------------------- | -------------------------------------------------------------- |
-| `npm start`            | Arranca el servidor                                            |
-| `npm run dev`          | Arranca con recarga automática                                 |
-| `npm run db:migrar`    | Aplica las migraciones pendientes                              |
-| `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (137)                          |
-| `npm run lint`         | Revisa el código con ESLint                                    |
-| `npm run format`       | Da formato a todos los archivos con Prettier                   |
-| `npm run format:check` | Comprueba el formato sin modificar nada                        |
+| Comando                        | Qué hace                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| `npm start`                    | Arranca el servidor                                            |
+| `npm run dev`                  | Arranca con recarga automática                                 |
+| `npm run db:migrar`            | Aplica las migraciones pendientes                              |
+| `npm run db:reset`             | Borra la base, aplica las migraciones y carga datos de ejemplo |
+| `npm run catalogo:antofagasta` | Genera el catálogo de líneas reales de Antofagasta             |
+| `npm test`                     | Ejecuta las pruebas automáticas (222)                          |
+| `npm run lint`                 | Revisa el código con ESLint                                    |
+| `npm run format`               | Da formato a todos los archivos con Prettier                   |
+| `npm run format:check`         | Comprueba el formato sin modificar nada                        |
 
 ## Estructura
 
@@ -46,10 +48,12 @@ Backend/
 │   │   └── validar.js          # valida params, query y body con Zod
 │   ├── modules/
 │   │   ├── auth/               # ACC-01 a ACC-04
-│   │   ├── red/                # RED-01 y RED-02
+│   │   ├── red/                # RED-01, RED-02 y ADM-01 (gestión de la red)
 │   │   ├── favoritos/          # RED-02: paraderos favoritos
 │   │   ├── turnos/             # ADM-03
 │   │   ├── conductor/          # VEH-03
+│   │   ├── ubicacion/          # VEH-01 GPS, RED-03 vehículos, ADM-04 monitoreo, simulador de flota
+│   │   ├── vinculacion/        # VIA-01
 │   │   └── viajes/             # VIA-02 y simulador
 │   ├── routes/health.routes.js
 │   └── utils/httpErrors.js
@@ -395,23 +399,40 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 
 ### Turnos y vehículo (VEH-03) · conductor
 
-| Método y ruta                                         | Descripción                                                     |
-| ----------------------------------------------------- | --------------------------------------------------------------- |
-| `GET /api/v1/conductor/turnos`                        | Mis turnos con vehículo y recorridos.                           |
-| `GET /api/v1/conductor/turnos/:id`                    | Detalle de uno de mis turnos.                                   |
-| `POST /api/v1/conductor/turnos/:id/iniciar`           | Inicia el turno y registra el estado del vehículo.              |
-| `POST /api/v1/conductor/turnos/:id/finalizar`         | Finaliza el turno y registra el estado del vehículo.            |
-| `POST /api/v1/conductor/turnos/:id/estado-vehiculo`   | Cambia el estado del vehículo (con observación si corresponde). |
-| `POST /api/v1/conductor/turnos/:id/incidencias`       | Registra una incidencia del vehículo o del recorrido.           |
-| `PUT /api/v1/conductor/turnos/:id/justificacion`      | Justifica atraso o término anticipado del turno.                |
-| `POST /api/v1/conductor/viajes/:id/iniciar`           | Inicia un viaje (en orden y con el turno en curso).             |
-| `POST /api/v1/conductor/viajes/:id/finalizar`         | Finaliza el viaje y cierra sus solicitudes de parada.           |
-| `GET /api/v1/conductor/viajes/:id/solicitudes-parada` | Solicitudes abiertas agrupadas por paradero, en orden.          |
-| `PUT /api/v1/conductor/viajes/:id/justificacion`      | Justifica atraso o término anticipado del viaje.                |
-| `GET /api/v1/admin/incidencias`                       | (administrador) Incidencias registradas por los conductores.    |
-| `GET /api/v1/admin/vehiculos/:id/historial`           | (administrador) Historial de estados de un vehículo.            |
+| Método y ruta                                         | Descripción                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /api/v1/conductor/turnos`                        | Mis turnos con vehículo y recorridos.                                 |
+| `GET /api/v1/conductor/turnos/:id`                    | Detalle de uno de mis turnos.                                         |
+| `POST /api/v1/conductor/turnos/:id/iniciar`           | Inicia el turno y registra el estado del vehículo.                    |
+| `POST /api/v1/conductor/turnos/:id/finalizar`         | Finaliza el turno y registra el estado del vehículo.                  |
+| `POST /api/v1/conductor/turnos/:id/estado-vehiculo`   | Cambia el estado del vehículo (con observación si corresponde).       |
+| `POST /api/v1/conductor/turnos/:id/incidencias`       | Registra una incidencia del vehículo o del recorrido.                 |
+| `PUT /api/v1/conductor/turnos/:id/justificacion`      | Justifica atraso o término anticipado del turno.                      |
+| `POST /api/v1/conductor/viajes/:id/iniciar`           | Inicia un viaje (en orden y con el turno en curso).                   |
+| `POST /api/v1/conductor/viajes/:id/finalizar`         | Finaliza el viaje y cierra sus solicitudes de parada.                 |
+| `GET /api/v1/conductor/viajes/:id/solicitudes-parada` | Solicitudes abiertas agrupadas por paradero, en orden.                |
+| `POST /api/v1/conductor/viajes/:id/alertas-parada`    | (VEH-02) Pendientes por paradero y las solicitudes nuevas sin avisar. |
+| `PUT /api/v1/conductor/viajes/:id/justificacion`      | Justifica atraso o término anticipado del viaje.                      |
+| `GET /api/v1/admin/incidencias`                       | (administrador) Incidencias registradas por los conductores.          |
+| `GET /api/v1/admin/vehiculos/:id/historial`           | (administrador) Historial de estados de un vehículo.                  |
 
-### Solicitud de parada (VIA-02) · pasajero
+### Vinculación con un vehículo (VIA-01) · pasajero (registrado o invitado)
+
+| Método y ruta                               | Descripción                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /api/v1/vinculacion/vehiculos/:codigo` | Consulta la micro antes de confirmar: vehículo, línea, sentido, destino. |
+| `POST /api/v1/vinculacion`                  | Vincula. Body: `{ "codigo": "BUS-01" }` (o el texto del QR).             |
+| `GET /api/v1/vinculacion`                   | Mi vinculación activa, o `null`.                                         |
+| `DELETE /api/v1/vinculacion`                | Me desvinculo; cierra mi solicitud de parada pendiente de ese viaje.     |
+
+- El código es el identificador del vehículo; el QR contiene `voybus://vehiculo/BUS-01`. Se
+  acepta cualquiera de las dos formas, sin importar mayúsculas.
+- Código inexistente → 404; vehículo sin viaje en curso → 409. En ambos casos no se vincula.
+- Una sola vinculación activa por pasajero (índice único en la base): para cambiar de micro hay
+  que desvincularse primero (409 si no).
+- Termina sola cuando el conductor finaliza el viaje.
+
+### Solicitud de parada (VIA-02) · pasajero vinculado al viaje
 
 | Método y ruta                                   | Descripción                                                             |
 | ----------------------------------------------- | ----------------------------------------------------------------------- |
@@ -419,16 +440,67 @@ Requieren `Authorization: Bearer <token>`. Los invitados responden `403 CUENTA_I
 | `POST /api/v1/viajes/:id/solicitudes-parada`    | Solicita parada. Body: `{ "paradero_id": 3 }`. Una pendiente por viaje. |
 | `GET /api/v1/viajes/:id/solicitudes-parada/mia` | Mi solicitud y su estado.                                               |
 
+Sin vinculación activa con ese viaje, responden 403 con código `NO_VINCULADO`.
+
 Estados de una solicitud: `enviada` → `proxima` (es el siguiente paradero) → `cerrada`
-(motivo `paradero_superado` o `viaje_finalizado`).
+(motivo `paradero_superado`, `viaje_finalizado` o `pasajero_desvinculado`). Cambian solos con cada posición del GPS.
+
+### Ubicación del vehículo (VEH-01) · conductor
+
+| Método y ruta                                 | Descripción                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| `POST /api/v1/conductor/viajes/:id/ubicacion` | Posición del teléfono durante un viaje en curso. Devuelve el avance. |
+
+Body: `{ "latitud": -23.63, "longitud": -70.40, "precision_m": 8, "origen": "gps" }`
+(`precision_m` y `origen` son opcionales; `origen: "simulador"` solo en desarrollo).
+
+- La app la envía cada 5 segundos. Cada posición se proyecta sobre el recorrido (tramos rectos
+  entre paraderos) y un paradero queda **superado** cuando el vehículo pasa 25 m más allá de él.
+  Con eso se ponen al día las solicitudes de parada.
+- El avance nunca retrocede. Una posición con precisión peor que 100 m, o a más de 250 m del
+  recorrido, se guarda pero no cambia el avance (la respuesta lo indica con
+  `precision_insuficiente` o `fuera_de_recorrido`).
+- El último paradero no se "supera": sus solicitudes se cierran al finalizar el viaje.
+
+### Vehículos en circulación (RED-03) · públicos
+
+| Método y ruta                        | Descripción                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `GET /api/v1/vehiculos?linea_id=1`   | Vehículos con viaje en curso (todos o de una línea), con última ubicación. |
+| `GET /api/v1/paraderos/cercanos`     | Paraderos a menos de 1,5 km. Query: `latitud`, `longitud`, `limite`.       |
+| `GET /api/v1/paraderos/:id/proximas` | Micros que se dirigen al paradero: paraderos y metros que les faltan.      |
+
+Cada vehículo trae identificador, línea, sentido, destino, `ultima_ubicacion` con
+`registrado_en`, `segundos_desde_actualizacion` y `ubicacion_atrasada` (más de 30 s sin datos:
+se conserva la última posición y se avisa). Los viajes finalizados dejan de aparecer.
+
+### Monitoreo de la operación (ADM-04) · administrador
+
+| Método y ruta                 | Descripción                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/v1/admin/monitoreo` | Resumen y vehículos en circulación con conductor, turno, ubicación, solicitudes pendientes por paradero, estado e incidencias. |
+
+La falta de señal solo se informa (`ubicacion_atrasada`): no marca al conductor como ausente ni
+finaliza el viaje.
 
 ### Simulador (solo desarrollo)
 
-Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar sin GPS real:
+Existe mientras `NODE_ENV` no sea `production`. Sirve para probar sin salir a la calle: la app
+del conductor puede enviar posiciones simuladas por el recorrido (`origen: "simulador"`) por la
+misma ruta del GPS, y además está esta ruta para saltar al siguiente paradero:
 
 | Método y ruta                               | Descripción                               |
 | ------------------------------------------- | ----------------------------------------- |
 | `POST /api/v1/simulador/viajes/:id/avanzar` | Avanza el vehículo al siguiente paradero. |
+| `GET /api/v1/simulador/flota`               | Estado del simulador de flota.            |
+| `POST /api/v1/simulador/flota/iniciar`      | Pone 4 micros de demostración en ruta.    |
+| `POST /api/v1/simulador/flota/detener`      | Cierra sus viajes y turnos.               |
+
+El **simulador de flota** mueve BUS-02 a BUS-05 por las líneas 103 y 107 (ida y vuelta) y envía
+sus posiciones por la misma ruta del GPS. BUS-04 deja de enviar a ratos para mostrar una ubicación
+atrasada. Usa conductores de demostración sin contraseña (no se puede entrar con ellos). Con
+`SIMULAR_FLOTA=1` en `.env` arranca solo junto al servidor, y al reiniciar se limpia lo que haya
+quedado de una simulación anterior.
 
 ## Base de datos
 
@@ -438,6 +510,81 @@ Existe mientras `NODE_ENV` no sea `production`. Mueve el vehículo para probar s
 - Cambios de esquema: crear una migración nueva en `src/database/migrations/`
   (no editar las ya aplicadas).
 
-## Pendiente
+## Gestión de la red (ADM-01) · administrador
 
-- Comprobar la vinculación del pasajero al viaje (VIA-01) en `viajes.service`.
+| Método y ruta                                  | Descripción                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `GET /api/v1/admin/red/lineas`                 | Todas las líneas (también desactivadas) con sus recorridos.                                  |
+| `POST /api/v1/admin/red/lineas`                | Crea. Body: `codigo`, `nombre`, `color` (#RRGGBB), `estado_servicio`.                        |
+| `GET /api/v1/admin/red/lineas/:id`             | Línea con sus recorridos y paraderos en orden.                                               |
+| `PUT /api/v1/admin/red/lineas/:id`             | Edita cualquiera de esos campos.                                                             |
+| `POST /api/v1/admin/red/lineas/:id/recorridos` | Crea un recorrido: `sentido`, `dias_funcionamiento`, `horarios`, `paraderos` (ids en orden). |
+| `GET /api/v1/admin/red/recorridos/:id`         | Recorrido con paraderos y viajes en curso.                                                   |
+| `PUT /api/v1/admin/red/recorridos/:id`         | Edita días, horarios, `activo` o el orden de `paraderos`.                                    |
+| `GET /api/v1/admin/red/paraderos`              | Todos los paraderos con cuántos recorridos los usan.                                         |
+| `POST /api/v1/admin/red/paraderos`             | Crea: `codigo`, `nombre`, `latitud`, `longitud`.                                             |
+| `GET /api/v1/admin/red/paraderos/:id`          | Paradero con los recorridos que lo usan.                                                     |
+| `PUT /api/v1/admin/red/paraderos/:id`          | Edita, mueve o activa/desactiva.                                                             |
+
+| `POST /api/v1/admin/red/recorridos/:id/trazado` | Traza el recorrido por las calles, por sus paraderos en orden (OSRM). |
+| `DELETE /api/v1/admin/red/recorridos/:id/trazado` | Quita el trazado: vuelve a tramos rectos entre paraderos. |
+
+- Los códigos de líneas y de paraderos no se repiten (sin distinguir mayúsculas): 409.
+- Un recorrido necesita al menos 2 paraderos activos, sin repetir; uno por sentido y línea.
+- Desactivar una línea, un recorrido o un paradero lo oculta de las consultas públicas e impide
+  usarlo en turnos y recorridos nuevos.
+- **Los cambios no alteran los viajes en curso:** mientras un recorrido tenga viajes en curso no
+  se cambian sus paraderos, y un paradero en uso no se mueve ni se desactiva (409, indicando
+  cuántos viajes hay). Días, horarios, nombres y colores se pueden cambiar siempre.
+- **Trazado por las calles:** se calcula con OSRM (gratis, sobre OpenStreetMap; respeta los
+  sentidos del tránsito). Si se cambian los paraderos del recorrido o se mueve uno más de 15 m,
+  el trazado se borra y hay que volver a generarlo. Con viajes en curso no se cambia (409). Un
+  paradero a más de 50 m de una calle se informa por su nombre (422); sin internet, 503.
+  Las consultas públicas entregan `trazado` (puntos `[lat, lng]`) o `null` (tramos rectos), y
+  el avance de las micros (VEH-01) y las distancias de RED-03 se miden por ese trazado.
+
+## Catálogo "Antofagasta real"
+
+**Desde la app (administrador):** pestaña Red → "Red real de Antofagasta". Ahí se genera
+(el servidor descarga las calles y traza las líneas en segundo plano, con avance en pantalla),
+se vuelve a cargar la ya generada o se vuelve a la red de prueba. Nada se borra: lo que no es
+de la red elegida queda desactivado. Con viajes en curso no se cambia (409; detén antes el
+simulador de flota).
+
+| Método y ruta                                | Descripción                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `GET /api/v1/admin/red/importacion`          | Red activa, catálogo generado (si hay) y avance de la generación. |
+| `POST /api/v1/admin/red/importacion/generar` | Genera y aplica la red real (202). Body opcional: `descargar`.    |
+| `POST /api/v1/admin/red/importacion/archivo` | Aplica la red ya generada (404 si no hay).                        |
+| `POST /api/v1/admin/red/importacion/prueba`  | Vuelve a la red de prueba.                                        |
+
+**Desde la terminal:** `npm run db:reset` carga la red indicada en `CATALOGO` (`.env`): `antofagasta` (por defecto)
+o `prueba` (la red pequeña que usan las pruebas automáticas). El catálogo de Antofagasta tiene
+6 líneas reales (102, 103, 107, 108, 119 y 129) con ida y vuelta por las calles, y se genera
+**una vez** con internet:
+
+```bash
+npm run catalogo:antofagasta      # unos 2 minutos; crea src/database/seeders/antofagasta.json
+npm run db:reset
+```
+
+- **Itinerarios:** Letreros Únicos de Recorrido del Perímetro de Exclusión de Antofagasta
+  (DTPR, Ministerio de Transportes). Están en `src/modules/red/antofagasta/lineas.js`.
+- **Calles y paraderos:** © colaboradores de OpenStreetMap (licencia ODbL), con la API Overpass.
+- **Trazado:** OSRM. El generador busca cada calle del itinerario, calcula dónde se cruzan,
+  traza el camino y ubica paraderos cada 350 a 900 m (los de OpenStreetMap, las esquinas donde
+  la micro dobla y, si falta, intermedios), con nombres como "Avenida Angamos / Uribe".
+- Al terminar muestra lo que conviene revisar y deja `data/antofagasta-vista-previa.geojson`
+  para verlo en <https://geojson.io>. Cualquier detalle se corrige después desde la app (ADM-01).
+- Trazados y paraderos son aproximados; días, horarios y colores son de demostración.
+
+## Avisos de parada (VEH-02)
+
+`POST /conductor/viajes/:id/alertas-parada` devuelve `pendientes` (paraderos con solicitudes
+abiertas, en orden del recorrido, con su total) y `nuevas` (las que todavía no se le habían
+avisado al conductor, que quedan marcadas en `solicitudes_parada.avisada_en`). Así un aviso nunca
+se repite, tampoco al reconectarse, y los paraderos superados no aparecen porque sus solicitudes
+ya se cerraron. La app lo consulta cada 5 segundos durante el viaje.
+
+`GET /viajes/:id/paraderos-disponibles` (pasajero) incluye `ubicacion_vehiculo` con la hora de la
+última posición e `informacion_atrasada` (VIA-03).

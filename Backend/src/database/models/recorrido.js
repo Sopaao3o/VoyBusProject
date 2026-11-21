@@ -10,6 +10,9 @@ module.exports = (sequelize) =>
       dias_funcionamiento: { type: DataTypes.STRING, allowNull: false },
       horarios: { type: DataTypes.STRING, allowNull: false },
       activo: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+      // Puntos [latitud, longitud] por las calles, guardados como JSON. Ver leerTrazado().
+      trazado: { type: DataTypes.TEXT, allowNull: true },
+      trazado_actualizado_en: { type: DataTypes.STRING, allowNull: true },
     },
     { tableName: 'recorridos', timestamps: false },
   );

@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { EstadoVehiculoBody, GrupoSolicitudes, TurnoConductor } from './tipos';
+import type { AlertasParada, EstadoVehiculoBody, GrupoSolicitudes, TurnoConductor } from './tipos';
 
 // VEH-03: solo conductores habilitados.
 const dato = <T>(r: { data: T }) => r.data;
@@ -44,3 +44,7 @@ export const justificarViaje = (id: number, justificacion: string) =>
 
 export const solicitudesDeParada = (viajeId: number) =>
   api<GrupoSolicitudes[]>(`/conductor/viajes/${viajeId}/solicitudes-parada`).then(dato);
+
+// VEH-02: avisos de parada (marca como avisadas las solicitudes nuevas que devuelve).
+export const alertasDeParada = (viajeId: number) =>
+  api<AlertasParada>(`/conductor/viajes/${viajeId}/alertas-parada`, { method: 'POST' }).then(dato);

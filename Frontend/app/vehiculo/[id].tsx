@@ -1,7 +1,9 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import { historialDeVehiculo, listarIncidencias, listarVehiculos } from '../../src/api/admin';
+import { textoQrDe } from '../../src/api/vinculacion';
 import { Cargando, ErrorMensaje } from '../../src/components/Estados';
 import { TarjetaIncidencia } from '../../src/components/TarjetaIncidencia';
 import { useApi } from '../../src/hooks/useApi';
@@ -11,6 +13,7 @@ import { etiquetaEstadoVehiculo } from '../../src/utils/textos';
 
 // VEH-03 (administrador): un vehículo con su historial de cambios de estado (fecha, responsable
 // y observación) y las incidencias que los conductores informaron sobre él.
+// VIA-01: también muestra el código QR que se pega dentro de la micro.
 export default function VehiculoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const vehiculoId = Number(id);
@@ -47,6 +50,16 @@ export default function VehiculoScreen() {
         </Text>
       </View>
 
+      <Text style={styles.subtitulo}>Código QR de la micro</Text>
+      <View style={[styles.tarjeta, styles.qr]}>
+        <QRCode value={textoQrDe(vehiculo.identificador)} size={180} />
+        <Text style={styles.codigo}>{vehiculo.identificador}</Text>
+        <Text style={[styles.dato, styles.centrado]}>
+          Imprímelo y pégalo junto a la puerta. Los pasajeros lo escanean para vincularse a esta
+          micro, o escriben el código de abajo.
+        </Text>
+      </View>
+
       <Text style={styles.subtitulo}>Cambios de estado</Text>
       {historial.length === 0 && (
         <Text style={styles.dato}>Este vehículo no tiene cambios de estado registrados.</Text>
@@ -75,6 +88,9 @@ export default function VehiculoScreen() {
 }
 
 const styles = StyleSheet.create({
+  qr: { alignItems: 'center', gap: 8, paddingVertical: 18 },
+  codigo: { fontSize: 22, fontWeight: '800', letterSpacing: 2, color: colors.text },
+  centrado: { textAlign: 'center' },
   contenido: { padding: 16, gap: 12, paddingBottom: 40 },
   tarjeta: {
     backgroundColor: colors.surface,

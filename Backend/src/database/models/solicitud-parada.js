@@ -12,6 +12,7 @@ module.exports = (sequelize) =>
       motivo_cierre: DataTypes.STRING,
       creada_en: { type: DataTypes.STRING, allowNull: false },
       cerrada_en: DataTypes.STRING,
+      avisada_en: DataTypes.STRING,
     },
     { tableName: 'solicitudes_parada', timestamps: false },
   );

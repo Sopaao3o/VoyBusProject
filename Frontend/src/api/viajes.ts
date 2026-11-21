@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { ParaderosDisponibles, SolicitudParada, ViajeEnCurso } from './tipos';
+import type { ParaderosDisponibles, SolicitudParada } from './tipos';
 
 const dato = <T>(r: { data: T }) => r.data;
 
@@ -13,9 +13,7 @@ export const solicitarParada = (viajeId: number, paraderoId: number) =>
     body: { paradero_id: paraderoId },
   }).then(dato);
 
-// Solo desarrollo: reemplazan a la vinculación por QR (VIA-01) y al GPS del conductor.
-export const viajesEnCurso = () => api<ViajeEnCurso[]>('/simulador/viajes-en-curso').then(dato);
-
+// Solo desarrollo: adelanta el vehículo al siguiente paradero, sin GPS.
 export const avanzarVehiculo = (viajeId: number) =>
   api<{ ultimo_orden_superado: number }>(`/simulador/viajes/${viajeId}/avanzar`, {
     method: 'POST',

@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const { notFound, conflict, HttpError } = require('../../utils/httpErrors');
 const { turnoCompleto } = require('../turnos/turno-detalle');
 const { evaluar } = require('./evaluacion');
+const { terminarVinculacionesDelViaje } = require('../vinculacion/terminar');
 
 /**
  * Ojo con las transacciones: con una sola conexión SQLite, toda consulta que se haga
@@ -94,6 +95,51 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
     }
     await fila.update({ justificacion_atraso: justificacion }, { transaction });
     return detalle(turnoId, transaction);
+  }
+
+  /** Solicitudes abiertas de un viaje y su agrupación por paradero, en orden del recorrido. */
+  async function solicitudesAbiertas(viaje, transaction) {
+    const solicitudes = await SolicitudParada.findAll({
+      where: { viaje_id: viaje.id, estado: { [Op.ne]: 'cerrada' } },
+      include: [
+        { model: Usuario, as: 'pasajero' },
+        { model: Paradero, as: 'paradero' },
+      ],
+      order: [
+        ['creada_en', 'ASC'],
+        ['id', 'ASC'],
+      ],
+      transaction,
+    });
+    const paradas = await RecorridoParadero.findAll({
+      where: { recorrido_id: viaje.recorrido_id },
+      transaction,
+    });
+    const ordenDe = new Map(paradas.map((p) => [p.paradero_id, p.orden]));
+
+    const grupos = new Map();
+    for (const s of solicitudes) {
+      if (!grupos.has(s.paradero_id)) {
+        const { id, codigo, nombre } = s.paradero;
+        grupos.set(s.paradero_id, {
+          paradero: { id, codigo, nombre, orden: ordenDe.get(id) },
+          total: 0,
+          solicitudes: [],
+        });
+      }
+      const grupo = grupos.get(s.paradero_id);
+      grupo.total++;
+      grupo.solicitudes.push({
+        id: s.id,
+        pasajero_nombre: s.pasajero.nombre_visible,
+        estado: s.estado,
+        creada_en: s.creada_en,
+      });
+    }
+    return {
+      solicitudes,
+      grupos: [...grupos.values()].sort((a, b) => a.paradero.orden - b.paradero.orden),
+    };
   }
 
   return {
@@ -220,6 +266,8 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
           { estado: 'cerrada', motivo_cierre: 'viaje_finalizado', cerrada_en: ahoraISO() },
           { where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } }, transaction },
         );
+        // VIA-01: los pasajeros quedan desvinculados del vehículo.
+        await terminarVinculacionesDelViaje(models, viajeId, ahoraISO, transaction);
         return detalle(turno.id, transaction);
       });
     },
@@ -283,44 +331,44 @@ function createConductorService(models, { ahora = () => new Date() } = {}) {
       return sequelize.transaction(async (transaction) => {
         await exigirConductor(conductorId, transaction);
         const { viaje } = await viajePropio(conductorId, viajeId, transaction);
-        const solicitudes = await SolicitudParada.findAll({
-          where: { viaje_id: viajeId, estado: { [Op.ne]: 'cerrada' } },
-          include: [
-            { model: Usuario, as: 'pasajero' },
-            { model: Paradero, as: 'paradero' },
-          ],
-          order: [
-            ['creada_en', 'ASC'],
-            ['id', 'ASC'],
-          ],
-          transaction,
-        });
-        const paradas = await RecorridoParadero.findAll({
-          where: { recorrido_id: viaje.recorrido_id },
-          transaction,
-        });
-        const ordenDe = new Map(paradas.map((p) => [p.paradero_id, p.orden]));
+        const { grupos } = await solicitudesAbiertas(viaje, transaction);
+        return grupos;
+      });
+    },
 
-        const grupos = new Map();
-        for (const s of solicitudes) {
-          if (!grupos.has(s.paradero_id)) {
-            const { id, codigo, nombre } = s.paradero;
-            grupos.set(s.paradero_id, {
-              paradero: { id, codigo, nombre, orden: ordenDe.get(id) },
-              total: 0,
-              solicitudes: [],
-            });
-          }
-          const grupo = grupos.get(s.paradero_id);
-          grupo.total++;
-          grupo.solicitudes.push({
-            id: s.id,
-            pasajero_nombre: s.pasajero.nombre_visible,
-            estado: s.estado,
-            creada_en: s.creada_en,
-          });
+    /**
+     * VEH-02: avisos de parada para el conductor. Devuelve los paraderos con solicitudes
+     * pendientes (en orden del recorrido) y, aparte, las solicitudes que todavía no se le habían
+     * avisado, que quedan marcadas como avisadas. Así un aviso nunca se repite, ni siquiera al
+     * reconectarse, y los paraderos ya superados no aparecen (sus solicitudes ya se cerraron).
+     */
+    async alertasDeParada(conductorId, viajeId) {
+      return sequelize.transaction(async (transaction) => {
+        await exigirConductor(conductorId, transaction);
+        const { viaje } = await viajePropio(conductorId, viajeId, transaction);
+        if (viaje.estado !== 'en_curso') throw conflict('El viaje no está en curso');
+        const { grupos, solicitudes } = await solicitudesAbiertas(viaje, transaction);
+
+        const sinAvisar = solicitudes.filter((s) => !s.avisada_en);
+        if (sinAvisar.length > 0) {
+          await SolicitudParada.update(
+            { avisada_en: ahoraISO() },
+            { where: { id: { [Op.in]: sinAvisar.map((s) => s.id) } }, transaction },
+          );
         }
-        return [...grupos.values()].sort((a, b) => a.paradero.orden - b.paradero.orden);
+        const nuevas = grupos
+          .map((g) => ({
+            paradero: g.paradero,
+            nuevas: sinAvisar.filter((s) => s.paradero_id === g.paradero.id).length,
+            total: g.total,
+          }))
+          .filter((g) => g.nuevas > 0);
+
+        return {
+          pendientes: grupos.map(({ paradero, total }) => ({ paradero, total })),
+          nuevas,
+          total_pendientes: solicitudes.length,
+        };
       });
     },
 

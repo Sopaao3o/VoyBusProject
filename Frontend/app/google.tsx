@@ -31,7 +31,7 @@ export default function RetornoGoogle() {
             router.replace({ pathname: '/login', params: { desafio: respuesta.desafio } });
           } else {
             iniciarSesion(respuesta);
-            router.replace('/usuario');
+            router.replace('/');
           }
           return;
         } catch (e) {
@@ -41,7 +41,7 @@ export default function RetornoGoogle() {
       }
       if (!vigente) return;
       if (router.canGoBack()) router.back();
-      else router.replace('/usuario');
+      else router.replace('/');
     })();
     return () => {
       vigente = false;

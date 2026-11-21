@@ -1,10 +1,14 @@
 // VIA-02: selección de destino y solicitud digital de parada (vista del pasajero).
 const { Op, UniqueConstraintError } = require('sequelize');
 const { notFound, conflict, badRequest, HttpError } = require('../../utils/httpErrors');
+const { actualizarSolicitudes } = require('./solicitudes');
+const { UMBRAL_ATRASADA_S } = require('../ubicacion/circulacion.service');
+const { trazadoUtilizable } = require('../ubicacion/geo');
 
 const TEXTO_CIERRE = {
   paradero_superado: 'El vehículo ya superó tu paradero',
   viaje_finalizado: 'El viaje finalizó',
+  pasajero_desvinculado: 'Te desvinculaste del vehículo',
 };
 
 /**
@@ -24,17 +28,31 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     RecorridoParadero,
     SolicitudParada,
     UbicacionVehiculo,
+    Vinculacion,
   } = models;
   const ahoraISO = () => ahora().toISOString();
   const abierta = { [Op.ne]: 'cerrada' };
 
-  // TODO(VIA-01): cuando exista la vinculación del pasajero con un viaje, comprobar aquí
-  // que el pasajero está vinculado a este viaje.
   async function exigirPasajero(id, transaction) {
     const u = await Usuario.findByPk(id, { transaction });
     if (!u || u.rol !== 'pasajero') throw new HttpError(403, 'Esta acción es solo para pasajeros');
     if (u.estado !== 'habilitado') throw new HttpError(403, 'Tu cuenta no está habilitada');
     return u;
+  }
+
+  /** VIA-01: solo quien está vinculado a un viaje puede elegir destino y pedir parada en él. */
+  async function exigirVinculado(pasajeroId, viajeId, transaction) {
+    const v = await Vinculacion.findOne({
+      where: { pasajero_id: pasajeroId, viaje_id: viajeId, terminada_en: { [Op.is]: null } },
+      transaction,
+    });
+    if (!v) {
+      throw new HttpError(
+        403,
+        'Primero vincúlate a esta micro escaneando su código QR o escribiendo su código',
+        { code: 'NO_VINCULADO' },
+      );
+    }
   }
 
   /** El viaje, solo si está en curso (404 si no existe, 409 si no está en curso). */
@@ -84,54 +102,42 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     return presentarSolicitud(s, s.paradero, parada?.orden ?? null);
   }
 
-  /**
-   * Pone al día las solicitudes abiertas según hasta dónde llegó el vehículo:
-   *  - el vehículo superó el paradero → cerrada
-   *  - el paradero es el siguiente → próxima
-   *  - si no → enviada
-   * (Pasar cerca de un paradero no prueba que el vehículo se haya detenido: nunca se marca "atendida".)
-   */
-  async function actualizarSolicitudes(viaje, transaction) {
-    const abiertas = await SolicitudParada.findAll({
-      where: { viaje_id: viaje.id, estado: abierta },
-      transaction,
-    });
-    let cerradas = 0;
-    for (const s of abiertas) {
-      const parada = await RecorridoParadero.findOne({
-        where: { recorrido_id: viaje.recorrido_id, paradero_id: s.paradero_id },
-        transaction,
-      });
-      if (parada.orden <= viaje.ultimo_orden_superado) {
-        await s.update(
-          { estado: 'cerrada', motivo_cierre: 'paradero_superado', cerrada_en: ahoraISO() },
-          { transaction },
-        );
-        cerradas++;
-      } else {
-        const estado = parada.orden === viaje.ultimo_orden_superado + 1 ? 'proxima' : 'enviada';
-        if (s.estado !== estado) await s.update({ estado }, { transaction });
-      }
-    }
-    return cerradas;
-  }
-
   return {
     /** Paraderos del recorrido que el vehículo todavía no ha superado, en orden. */
     async paraderosDisponibles(pasajeroId, viajeId) {
       return sequelize.transaction(async (transaction) => {
         await exigirPasajero(pasajeroId, transaction);
         const viaje = await viajeEnCurso(viajeId, transaction);
-        const paradas = await RecorridoParadero.findAll({
-          where: {
-            recorrido_id: viaje.recorrido_id,
-            orden: { [Op.gt]: viaje.ultimo_orden_superado },
-          },
+        await exigirVinculado(pasajeroId, viaje.id, transaction);
+        const todas = await RecorridoParadero.findAll({
+          where: { recorrido_id: viaje.recorrido_id },
           include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
           order: [['orden', 'ASC']],
           transaction,
         });
+        const paradas = todas.filter((p) => p.orden > viaje.ultimo_orden_superado);
+        const recorrido = todas.map((p) => ({
+          ...presentarParadero(p.paradero, p.orden),
+          superado: p.orden <= viaje.ultimo_orden_superado,
+        }));
+        // VIA-03: si la micro dejó de enviar su ubicación, se conserva el último estado
+        // conocido y se avisa que la información puede estar atrasada.
+        const ubicacion = await UbicacionVehiculo.findOne({
+          where: { viaje_id: viaje.id },
+          order: [['id', 'DESC']],
+          transaction,
+        });
+        const segundos = ubicacion
+          ? Math.round((ahora() - new Date(ubicacion.registrado_en)) / 1000)
+          : null;
         return {
+          ubicacion_vehiculo: {
+            latitud: ubicacion?.latitud ?? null,
+            longitud: ubicacion?.longitud ?? null,
+            registrado_en: ubicacion?.registrado_en ?? null,
+            segundos_desde_actualizacion: segundos,
+            informacion_atrasada: segundos === null || segundos > UMBRAL_ATRASADA_S,
+          },
           viaje: {
             id: viaje.id,
             estado: viaje.estado,
@@ -139,6 +145,13 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
             linea_codigo: viaje.recorrido.linea.codigo,
             linea_nombre: viaje.recorrido.linea.nombre,
             ultimo_orden_superado: viaje.ultimo_orden_superado,
+            linea_color: viaje.recorrido.linea.color,
+          },
+          // Todo el recorrido (para el mapa): paraderos con `superado` y el trazado por calles.
+          recorrido: {
+            id: viaje.recorrido_id,
+            paraderos: recorrido,
+            trazado: trazadoUtilizable(recorrido, viaje.recorrido.trazado),
           },
           paraderos: paradas.map((p) => presentarParadero(p.paradero, p.orden)),
           mi_solicitud: await ultimaSolicitud(pasajeroId, viaje, transaction),
@@ -152,6 +165,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         return await sequelize.transaction(async (transaction) => {
           await exigirPasajero(pasajeroId, transaction);
           const viaje = await viajeEnCurso(viajeId, transaction);
+          await exigirVinculado(pasajeroId, viaje.id, transaction);
           const parada = await RecorridoParadero.findOne({
             where: { recorrido_id: viaje.recorrido_id, paradero_id: paraderoId },
             include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
@@ -198,8 +212,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
     },
 
     /**
-     * SIMULADOR (solo desarrollo): viajes en curso, para elegir uno mientras no exista
-     * la vinculación del pasajero por QR (VIA-01).
+     * SIMULADOR (solo desarrollo): viajes en curso, para pruebas.
      */
     async viajesEnCurso() {
       const viajes = await Viaje.findAll({
@@ -243,7 +256,7 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
           },
           { transaction },
         );
-        const cerradas = await actualizarSolicitudes(viaje, transaction);
+        const cerradas = await actualizarSolicitudes(models, viaje, ahoraISO, transaction);
         return {
           viaje_id: viaje.id,
           ultimo_orden_superado: viaje.ultimo_orden_superado,
