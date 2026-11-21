@@ -12,8 +12,15 @@ function textoSobre(fondo: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? colors.onSecondary : colors.surface;
 }
 
+/** Lo que hace falta para dibujar una micro (una VehiculoCirculacion sirve tal cual). */
+export type MicroEnMapa = Pick<VehiculoCirculacion, 'viaje_id' | 'ubicacion_atrasada'> & {
+  ultima_ubicacion: { latitud: number; longitud: number } | null;
+  vehiculo: { identificador: string };
+  linea: { codigo: string; color: string };
+};
+
 interface Props {
-  vehiculo: VehiculoCirculacion;
+  vehiculo: MicroEnMapa;
   seleccionado?: boolean;
   onPress?: () => void;
 }

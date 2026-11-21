@@ -1,6 +1,24 @@
 // ADM-01: el controlador solo traduce HTTP ↔ servicio.
-function createRedAdminController(service) {
+/**
+ * @param {ReturnType<import('./red.admin.service').createRedAdminService>} service
+ * @param {ReturnType<import('./antofagasta/importacion').createImportacionRed>} [importacion]
+ */
+function createRedAdminController(service, importacion) {
   return {
+    estadoImportacion: async (req, res) => res.json({ data: await importacion.estado() }),
+    generarRed: async (req, res) => {
+      await importacion.generar(req.datos.body ?? {});
+      res.status(202).json({ data: await importacion.estado() });
+    },
+    cargarRedArchivo: async (req, res) => {
+      const resultado = await importacion.cargarArchivo();
+      res.json({ data: { resultado, ...(await importacion.estado()) } });
+    },
+    volverRedPrueba: async (req, res) => {
+      const resultado = await importacion.volverAPrueba();
+      res.json({ data: { resultado, ...(await importacion.estado()) } });
+    },
+
     listarLineas: async (req, res) => {
       const data = await service.listarLineas();
       res.json({ data, meta: { total: data.length } });
@@ -20,6 +38,10 @@ function createRedAdminController(service) {
       res.json({ data: await service.obtenerRecorrido(req.datos.params.id) }),
     editarRecorrido: async (req, res) =>
       res.json({ data: await service.editarRecorrido(req.datos.params.id, req.datos.body) }),
+    trazarRecorrido: async (req, res) =>
+      res.json({ data: await service.trazarRecorrido(req.datos.params.id) }),
+    quitarTrazado: async (req, res) =>
+      res.json({ data: await service.quitarTrazado(req.datos.params.id) }),
 
     listarParaderos: async (req, res) => {
       const data = await service.listarParaderos();

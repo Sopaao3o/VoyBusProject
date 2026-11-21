@@ -21,8 +21,10 @@ import {
   listarParaderosAdmin,
   obtenerLineaAdmin,
   obtenerRecorridoAdmin,
+  quitarTrazado,
+  trazarRecorrido,
 } from '../../../src/api/redAdmin';
-import type { ParaderoAdmin, Sentido } from '../../../src/api/tipos';
+import type { ParaderoAdmin, Sentido, Trazado } from '../../../src/api/tipos';
 import { CajaError, Cargando, ErrorMensaje } from '../../../src/components/Estados';
 import { Aviso } from '../../../src/components/Etiquetas';
 import { Boton, Campo } from '../../../src/components/Formulario';
@@ -30,11 +32,14 @@ import { Mapa } from '../../../src/components/mapa/Mapa';
 import { MarcadorParadero } from '../../../src/components/mapa/MarcadorParadero';
 import { useApi } from '../../../src/hooks/useApi';
 import { normalizarBusqueda } from '../../../src/utils/textos';
+import { fechaHora } from '../../../src/utils/fechas';
+import { caminoDelRecorrido, coordenadasMapa } from '../../../src/utils/recorrido';
 import { colors } from '../../../src/theme/colors';
 
 // ADM-01: crear o editar un recorrido: días, horarios, activo y los paraderos en orden
 // (el primero es el inicio y el último el término). Con viajes en curso, el servidor no deja
 // cambiar los paraderos, para no alterar a quienes van en ellos.
+// El trazado por las calles se genera aquí (servicio de rutas OSRM) con los paraderos guardados.
 // `id = "nuevo"` crea uno, con `?linea=` y `?sentido=`.
 export default function RecorridoAdminScreen() {
   const params = useLocalSearchParams<{ id: string; linea?: string; sentido?: Sentido }>();
@@ -61,6 +66,8 @@ export default function RecorridoAdminScreen() {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [listo, setListo] = useState(false);
+  const [trazado, setTrazado] = useState<{ puntos: Trazado; fecha: string | null } | null>(null);
+  const [trazando, setTrazando] = useState(false);
 
   // Al cargar, el formulario parte con los datos actuales del recorrido.
   const recorrido = carga.datos?.recorrido;
@@ -73,6 +80,7 @@ export default function RecorridoAdminScreen() {
     setHorarios(r?.horarios ?? '07:00 - 21:00');
     setActivo(r?.activo ?? true);
     setElegidos(r?.paraderos.map((p) => p.id) ?? []);
+    setTrazado(r?.trazado ? { puntos: r.trazado, fecha: r.trazado_actualizado_en } : null);
     setListo(true);
   }, [carga.datos, listo]);
 
@@ -80,7 +88,16 @@ export default function RecorridoAdminScreen() {
     (carga.datos?.paraderos ?? []).map((p) => [p.id, p]),
   );
   const enOrden = elegidos.map((pid) => porId.get(pid)).filter((p): p is ParaderoAdmin => !!p);
-  const puntos = enOrden.map((p) => ({ latitude: p.latitud, longitude: p.longitud }));
+  // El trazado guardado solo vale para los paraderos guardados: si se cambian, se ve en recto.
+  const guardados = recorrido?.paraderos.map((p) => p.id) ?? [];
+  const sinCambios =
+    guardados.length === elegidos.length && guardados.every((pid, i) => pid === elegidos[i]);
+  const puntos = coordenadasMapa(
+    caminoDelRecorrido(
+      enOrden.map((p, i) => ({ ...p, orden: i + 1 })),
+      sinCambios ? trazado?.puntos : null,
+    ),
+  );
   const clavePuntos = JSON.stringify(puntos);
 
   useEffect(() => {
@@ -153,6 +170,40 @@ export default function RecorridoAdminScreen() {
     }
   }
 
+  async function trazar() {
+    setTrazando(true);
+    try {
+      const r = await trazarRecorrido(Number(params.id));
+      setTrazado(r.trazado ? { puntos: r.trazado, fecha: r.trazado_actualizado_en } : null);
+      Alert.alert(
+        'Trazado listo',
+        `El recorrido sigue las calles: ${(r.largo_m / 1000).toFixed(1).replace('.', ',')} km.`,
+      );
+    } catch (e) {
+      Alert.alert('No se pudo trazar', textoDeError(e));
+    } finally {
+      setTrazando(false);
+    }
+  }
+
+  function confirmarQuitar() {
+    Alert.alert('Quitar trazado', 'El recorrido se dibujará en tramos rectos entre paraderos.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Quitar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await quitarTrazado(Number(params.id));
+            setTrazado(null);
+          } catch (e) {
+            Alert.alert('No se pudo quitar', textoDeError(e));
+          }
+        },
+      },
+    ]);
+  }
+
   const titulo = `${linea.codigo} · ${sentido === 'ida' ? 'Ida' : 'Vuelta'}`;
   return (
     <ScrollView contentContainerStyle={styles.contenido} keyboardShouldPersistTaps="handled">
@@ -173,6 +224,41 @@ export default function RecorridoAdminScreen() {
           ))}
         </Mapa>
       </View>
+
+      {!esNuevo && (
+        <View style={styles.trazado}>
+          <Ionicons
+            name={trazado ? 'git-branch' : 'remove-outline'}
+            size={22}
+            color={trazado ? colors.primary : colors.textMuted}
+          />
+          <View style={styles.textos}>
+            <Text style={styles.etiqueta}>
+              {trazado ? 'Sigue las calles' : 'En tramos rectos entre paraderos'}
+            </Text>
+            <Text style={styles.ayuda}>
+              {!sinCambios
+                ? 'Guarda los cambios de paraderos para trazarlo por las calles.'
+                : trazado
+                  ? `Trazado ${trazado.fecha ? `el ${fechaHora(trazado.fecha)}` : 'guardado'}.`
+                  : 'Trázalo para que el mapa y el avance de las micros sigan las calles.'}
+            </Text>
+          </View>
+        </View>
+      )}
+      {!esNuevo && sinCambios && enCurso === 0 && (
+        <View style={styles.botonesTrazado}>
+          <Boton
+            titulo={trazando ? 'Trazando…' : trazado ? 'Volver a trazar' : 'Trazar por calles'}
+            variante="secundario"
+            onPress={trazar}
+            deshabilitado={trazando}
+          />
+          {trazado && !trazando && (
+            <Boton titulo="Quitar trazado" variante="secundario" onPress={confirmarQuitar} />
+          )}
+        </View>
+      )}
 
       {enCurso > 0 && (
         <Aviso
@@ -304,6 +390,17 @@ export default function RecorridoAdminScreen() {
 }
 
 const styles = StyleSheet.create({
+  trazado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  botonesTrazado: { gap: 8 },
   contenido: { padding: 16, gap: 12, paddingBottom: 40 },
   mapa: { height: 220, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.border },
   interruptor: {

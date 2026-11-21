@@ -68,6 +68,7 @@ function Navegacion() {
         <Stack.Screen name="admin/linea/[id]" options={{ title: 'Línea' }} />
         <Stack.Screen name="admin/recorrido/[id]" options={{ title: 'Recorrido' }} />
         <Stack.Screen name="admin/paradero/[id]" options={{ title: 'Paradero' }} />
+        <Stack.Screen name="admin/red-antofagasta" options={{ title: 'Red real de Antofagasta' }} />
         <Stack.Screen name="viaje/[id]" options={{ title: 'Viaje' }} />
         <Stack.Screen name="conductor/turno/[id]" options={{ title: 'Turno' }} />
         <Stack.Screen name="conductor/viaje/[id]" options={{ title: 'Viaje' }} />

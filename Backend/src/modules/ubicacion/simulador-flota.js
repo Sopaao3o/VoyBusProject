@@ -4,7 +4,7 @@
 // cierra el viaje y vuelve en sentido contrario. Los conductores de demostración no tienen
 // contraseña: no se puede iniciar sesión con ellos.
 const { Op } = require('sequelize');
-const { puntoEnRecorrido, distanciasAcumuladas } = require('./geo');
+const { puntoEnRecorrido, crearRuta } = require('./geo');
 const { terminarVinculacionesDelViaje } = require('../vinculacion/terminar');
 
 const INTERVALO_MS = 5000;
@@ -46,7 +46,7 @@ function createSimuladorFlota(models, ubicacion, { ahora = () => new Date() } = 
   const ahoraISO = () => ahora().toISOString();
 
   let temporizador = null;
-  /** @type {{ plan: object, conductorId: number, turnoId: number, viajeId: number, recorridoId: number, paraderos: object[], largo: number, metros: number, vueltas: number }[]} */
+  /** @type {{ plan: object, conductorId: number, turnoId: number, viajeId: number, recorridoId: number, ruta: object, largo: number, metros: number, vueltas: number }[]} */
   let micros = [];
 
   async function conductorDemo(numero) {
@@ -78,8 +78,9 @@ function createSimuladorFlota(models, ubicacion, { ahora = () => new Date() } = 
       latitud: p.paradero.latitud,
       longitud: p.paradero.longitud,
     }));
-    const acumuladas = distanciasAcumuladas(paraderos);
-    return { id: r.id, paraderos, largo: acumuladas[acumuladas.length - 1] };
+    // La micro avanza por las calles si el recorrido tiene trazado.
+    const ruta = crearRuta(paraderos, r.trazado);
+    return { id: r.id, ruta, largo: ruta.largo };
   }
 
   /** Un viaje nuevo, ya en curso, dentro del turno de la micro. */
@@ -123,13 +124,13 @@ function createSimuladorFlota(models, ubicacion, { ahora = () => new Date() } = 
         const sentido =
           m.vueltas % 2 === 0 ? m.plan.sentido : m.plan.sentido === 'ida' ? 'vuelta' : 'ida';
         const r = await recorrido(m.plan.linea, sentido);
-        Object.assign(m, { recorridoId: r.id, paraderos: r.paraderos, largo: r.largo, metros: 0 });
+        Object.assign(m, { recorridoId: r.id, ruta: r.ruta, largo: r.largo, metros: 0 });
         m.viajeId = await nuevoViaje(m.turnoId, r.id, m.vueltas + 1);
       }
       // Corte de señal: entre el 35 % y el 55 % del trayecto no envía nada.
       const fraccion = m.metros / m.largo;
       if (m.plan.cortesDeSenal && fraccion > 0.35 && fraccion < 0.55) continue;
-      const punto = puntoEnRecorrido(m.paraderos, m.metros);
+      const punto = puntoEnRecorrido(m.ruta, m.metros);
       await ubicacion.registrar(m.conductorId, m.viajeId, {
         ...punto,
         precision_m: 5,
@@ -177,7 +178,7 @@ function createSimuladorFlota(models, ubicacion, { ahora = () => new Date() } = 
           turnoId: turno.id,
           viajeId,
           recorridoId: r.id,
-          paraderos: r.paraderos,
+          ruta: r.ruta,
           largo: r.largo,
           metros: r.largo * plan.inicio,
           vueltas: 0,

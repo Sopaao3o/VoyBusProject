@@ -1,5 +1,6 @@
 require('./config/zod');
 const express = require('express');
+const { HttpError } = require('./utils/httpErrors');
 const cors = require('cors');
 const morgan = require('morgan');
 
@@ -16,6 +17,8 @@ const { createRedRoutes } = require('./modules/red/red.routes');
 const { createRedAdminService } = require('./modules/red/red.admin.service');
 const { createRedAdminController } = require('./modules/red/red.admin.controller');
 const { createRedAdminRoutes } = require('./modules/red/red.admin.routes');
+const { createImportacionRed } = require('./modules/red/antofagasta/importacion');
+const { catalogoPrueba } = require('./database/seeders/datos-ejemplo');
 const { createFavoritosService } = require('./modules/favoritos/favoritos.service');
 const { createFavoritosController } = require('./modules/favoritos/favoritos.controller');
 const { createFavoritosRoutes } = require('./modules/favoritos/favoritos.routes');
@@ -61,6 +64,10 @@ const { createVinculacionRoutes } = require('./modules/vinculacion/vinculacion.r
  * @param {ReturnType<typeof createGoogleOAuth>} [deps.google] conexión con Google (las pruebas la reemplazan)
  * @param {ReturnType<typeof createSimuladorFlota>} [deps.flota] simulador de flota (si se omite y
  *   el simulador está activo, se crea uno)
+ * @param {typeof import('./modules/red/trazado').trazarPorCalles} [deps.trazador] genera trazados
+ *   por las calles (las pruebas lo reemplazan para no depender de internet)
+ * @param {ReturnType<typeof createImportacionRed>} [deps.importacionRed] cambio de toda la red
+ *   desde la app (las pruebas lo crean con fuentes falsas)
  */
 function createApp({
   models,
@@ -71,6 +78,8 @@ function createApp({
   exponerTokenRecuperacion = exponerCodigoVerificacion,
   google = createGoogleOAuth(),
   flota,
+  trazador,
+  importacionRed,
 }) {
   const app = express();
 
@@ -111,7 +120,16 @@ function createApp({
   v1.use(
     '/admin/red',
     autenticar,
-    createRedAdminRoutes(createRedAdminController(createRedAdminService(models))),
+    createRedAdminRoutes(
+      createRedAdminController(
+        createRedAdminService(models, {
+          ...(trazador ? { trazador } : {}),
+          ...(ahora ? { ahora } : {}),
+        }),
+        importacionRed ??
+          createImportacionRed(models, { ...(ahora ? { ahora } : {}), catalogoPrueba }),
+      ),
+    ),
   );
   const viajes = createViajesController(createViajesService(models, { ahora }));
   v1.use('/viajes', autenticar, createViajesRoutes(viajes));
@@ -142,7 +160,8 @@ function createApp({
       code = 'JSON_INVALIDO';
       message = 'El cuerpo de la petición no es un JSON válido';
     }
-    if (!status || status >= 500) {
+    // Un HttpError 5xx es intencional (por ejemplo, 503 si un servicio externo no responde).
+    if (!status || (status >= 500 && !(err instanceof HttpError))) {
       console.error(err);
       status = 500;
       code = 'ERROR_INTERNO';

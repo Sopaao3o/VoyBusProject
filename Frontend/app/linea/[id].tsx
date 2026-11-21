@@ -20,10 +20,11 @@ import { useApi } from '../../src/hooks/useApi';
 import { useEnVivo } from '../../src/hooks/useEnVivo';
 import { usePantallaMapa } from '../../src/hooks/usePantallaMapa';
 import { colors } from '../../src/theme/colors';
+import { caminoDelRecorrido, coordenadasMapa } from '../../src/utils/recorrido';
 
 const ALTURAS = [0.42, 0.88];
 
-// RED-01: una línea. El mapa dibuja el recorrido elegido (ida o vuelta) con sus paraderos
+// RED-01: una línea. El mapa dibuja el recorrido elegido (ida o vuelta) por las calles, con sus paraderos
 // numerados, y el panel muestra días, horarios y paraderos en orden.
 // RED-03: también muestra, en vivo, solo las micros de esta línea que tienen un viaje en curso.
 // `?recorrido=` permite llegar con un sentido ya elegido, y `?viaje=` con una micro marcada.
@@ -48,7 +49,8 @@ export default function LineaScreen() {
   // Si no se eligió ninguno (o el elegido ya no existe), se muestra el primero: la ida.
   const actual = linea?.recorridos.find((r) => r.id === elegido) ?? linea?.recorridos[0];
   const paraderos = actual ? [...actual.paraderos].sort((a, b) => a.orden - b.orden) : [];
-  const puntos = paraderos.map((p) => ({ latitude: p.latitud, longitude: p.longitud }));
+  // El recorrido se dibuja por las calles si tiene trazado (si no, en tramos rectos).
+  const puntos = coordenadasMapa(caminoDelRecorrido(paraderos, actual?.trazado));
   const clavePuntos = JSON.stringify(puntos);
 
   // Las micros del sentido elegido; las del otro sentido no se muestran para no confundir.

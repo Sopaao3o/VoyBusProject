@@ -2,7 +2,7 @@
 // Ambos se arman con los viajes en curso y la última ubicación que envió cada vehículo (VEH-01).
 const { Op } = require('sequelize');
 const { notFound } = require('../../utils/httpErrors');
-const { distancia, distanciasAcumuladas, proyectar } = require('./geo');
+const { distancia, crearRuta, proyectarEnRuta } = require('./geo');
 
 /** Una ubicación más vieja que esto se muestra como atrasada (sin borrarla ni ocultar la micro). */
 const UMBRAL_ATRASADA_S = 30;
@@ -158,9 +158,11 @@ function createCirculacionService(models, { ahora = () => new Date() } = {}) {
             paraderos.findIndex((p) => p.orden === viaje.ultimo_orden_superado),
             0,
           );
-          const proyeccion = proyectar(paraderos, ubicacion, desde);
+          // Metros por las calles (o en tramos rectos si el recorrido no tiene trazado).
+          const ruta = crearRuta(paraderos, viaje.recorrido.trazado);
+          const proyeccion = proyectarEnRuta(ruta, ubicacion, desde);
           if (proyeccion) {
-            const faltan = distanciasAcumuladas(paraderos)[indice] - proyeccion.avance;
+            const faltan = ruta.posiciones[indice] - proyeccion.avance;
             metros = Math.max(0, Math.round(faltan));
           }
         }

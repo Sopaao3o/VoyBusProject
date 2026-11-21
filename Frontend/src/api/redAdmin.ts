@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  EstadoRed,
   LineaAdmin,
   LineaAdminDetalle,
   LineaBody,
@@ -7,6 +8,7 @@ import type {
   ParaderoAdminDetalle,
   ParaderoBody,
   RecorridoAdmin,
+  ResultadoCambioRed,
   RecorridoBody,
 } from './tipos';
 
@@ -30,6 +32,14 @@ export const crearRecorrido = (lineaId: number, body: RecorridoBody) =>
 export const editarRecorrido = (id: number, body: Partial<Omit<RecorridoBody, 'sentido'>>) =>
   api<RecorridoAdmin>(`/admin/red/recorridos/${id}`, { method: 'PUT', body }).then(dato);
 
+/** Genera el trazado por las calles pasando por los paraderos en orden (servicio OSRM). */
+export const trazarRecorrido = (id: number) =>
+  api<RecorridoAdmin & { largo_m: number }>(`/admin/red/recorridos/${id}/trazado`, {
+    method: 'POST',
+  }).then(dato);
+export const quitarTrazado = (id: number) =>
+  api<RecorridoAdmin>(`/admin/red/recorridos/${id}/trazado`, { method: 'DELETE' }).then(dato);
+
 export const listarParaderosAdmin = () => api<ParaderoAdmin[]>('/admin/red/paraderos').then(dato);
 export const obtenerParaderoAdmin = (id: number) =>
   api<ParaderoAdminDetalle>(`/admin/red/paraderos/${id}`).then(dato);
@@ -37,3 +47,19 @@ export const crearParadero = (body: ParaderoBody) =>
   api<ParaderoAdminDetalle>('/admin/red/paraderos', { method: 'POST', body }).then(dato);
 export const editarParadero = (id: number, body: Partial<ParaderoBody>) =>
   api<ParaderoAdminDetalle>(`/admin/red/paraderos/${id}`, { method: 'PUT', body }).then(dato);
+
+// Cambiar toda la red: generar la real de Antofagasta (en segundo plano), cargarla o volver a
+// la de prueba.
+export const estadoRed = () => api<EstadoRed>('/admin/red/importacion').then(dato);
+export const generarRedAntofagasta = (descargar = false) =>
+  api<EstadoRed>('/admin/red/importacion/generar', { method: 'POST', body: { descargar } }).then(
+    dato,
+  );
+export const cargarRedAntofagasta = () =>
+  api<EstadoRed & { resultado: ResultadoCambioRed }>('/admin/red/importacion/archivo', {
+    method: 'POST',
+  }).then(dato);
+export const volverRedPrueba = () =>
+  api<EstadoRed & { resultado: ResultadoCambioRed }>('/admin/red/importacion/prueba', {
+    method: 'POST',
+  }).then(dato);

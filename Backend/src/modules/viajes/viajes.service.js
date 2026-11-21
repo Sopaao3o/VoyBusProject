@@ -3,6 +3,7 @@ const { Op, UniqueConstraintError } = require('sequelize');
 const { notFound, conflict, badRequest, HttpError } = require('../../utils/httpErrors');
 const { actualizarSolicitudes } = require('./solicitudes');
 const { UMBRAL_ATRASADA_S } = require('../ubicacion/circulacion.service');
+const { trazadoUtilizable } = require('../ubicacion/geo');
 
 const TEXTO_CIERRE = {
   paradero_superado: 'El vehículo ya superó tu paradero',
@@ -108,15 +109,17 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
         await exigirPasajero(pasajeroId, transaction);
         const viaje = await viajeEnCurso(viajeId, transaction);
         await exigirVinculado(pasajeroId, viaje.id, transaction);
-        const paradas = await RecorridoParadero.findAll({
-          where: {
-            recorrido_id: viaje.recorrido_id,
-            orden: { [Op.gt]: viaje.ultimo_orden_superado },
-          },
+        const todas = await RecorridoParadero.findAll({
+          where: { recorrido_id: viaje.recorrido_id },
           include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
           order: [['orden', 'ASC']],
           transaction,
         });
+        const paradas = todas.filter((p) => p.orden > viaje.ultimo_orden_superado);
+        const recorrido = todas.map((p) => ({
+          ...presentarParadero(p.paradero, p.orden),
+          superado: p.orden <= viaje.ultimo_orden_superado,
+        }));
         // VIA-03: si la micro dejó de enviar su ubicación, se conserva el último estado
         // conocido y se avisa que la información puede estar atrasada.
         const ubicacion = await UbicacionVehiculo.findOne({
@@ -129,6 +132,8 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
           : null;
         return {
           ubicacion_vehiculo: {
+            latitud: ubicacion?.latitud ?? null,
+            longitud: ubicacion?.longitud ?? null,
             registrado_en: ubicacion?.registrado_en ?? null,
             segundos_desde_actualizacion: segundos,
             informacion_atrasada: segundos === null || segundos > UMBRAL_ATRASADA_S,
@@ -140,6 +145,13 @@ function createViajesService(models, { ahora = () => new Date() } = {}) {
             linea_codigo: viaje.recorrido.linea.codigo,
             linea_nombre: viaje.recorrido.linea.nombre,
             ultimo_orden_superado: viaje.ultimo_orden_superado,
+            linea_color: viaje.recorrido.linea.color,
+          },
+          // Todo el recorrido (para el mapa): paraderos con `superado` y el trazado por calles.
+          recorrido: {
+            id: viaje.recorrido_id,
+            paraderos: recorrido,
+            trazado: trazadoUtilizable(recorrido, viaje.recorrido.trazado),
           },
           paraderos: paradas.map((p) => presentarParadero(p.paradero, p.orden)),
           mi_solicitud: await ultimaSolicitud(pasajeroId, viaje, transaction),

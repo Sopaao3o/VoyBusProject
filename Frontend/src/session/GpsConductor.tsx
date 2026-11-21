@@ -16,7 +16,12 @@ import { ApiError } from '../api/client';
 import { obtenerLinea } from '../api/red';
 import type { AvanceViaje, OrigenUbicacion } from '../api/tipos';
 import { enviarUbicacion } from '../api/ubicacion';
-import { largoRecorrido, puntoEnRecorrido, type Punto } from '../utils/recorrido';
+import {
+  caminoDelRecorrido,
+  largoRecorrido,
+  puntoEnRecorrido,
+  type Punto,
+} from '../utils/recorrido';
 import { useUsuario } from './UsuarioContext';
 
 // VEH-01: mientras el conductor tiene un viaje en curso, la app envía la ubicación de su
@@ -52,6 +57,8 @@ interface Contexto {
   ultimoEnvio: Date | null;
   /** Lo último que respondió el servidor: siguiente paradero, avisos de precisión, etc. */
   avance: AvanceViaje | null;
+  /** La última posición que el servidor recibió (para dibujar la micro en el mapa). */
+  posicion: Punto | null;
   /**
    * Pide el permiso de ubicación (si falta) y explica cómo darlo si se niega.
    * Se llama antes de iniciar un viaje: sin permiso, el viaje no se inicia.
@@ -77,6 +84,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
   const [viajeId, setViajeId] = useState<number | null>(null);
   const [ultimoEnvio, setUltimoEnvio] = useState<Date | null>(null);
   const [avance, setAvance] = useState<AvanceViaje | null>(null);
+  const [posicion, setPosicion] = useState<Punto | null>(null);
 
   // Lo que usan el temporizador y el GPS entre un envío y otro.
   const temporizador = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -101,6 +109,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
     setViajeId(null);
     setEstado('inactivo');
     setAvance(null);
+    setPosicion(null);
     setUltimoEnvio(null);
   }, [liberar]);
 
@@ -154,12 +163,11 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
           };
         };
       } else {
-        // Simulador (solo desarrollo): avanza por los paraderos del recorrido a velocidad constante.
+        // Simulador (solo desarrollo): avanza por el recorrido a velocidad constante.
         const linea = await obtenerLinea(viaje.lineaId);
         const recorrido = linea.recorridos.find((r) => r.id === viaje.recorridoId);
-        const puntos = [...(recorrido?.paraderos ?? [])]
-          .sort((a, b) => a.orden - b.orden)
-          .map((p) => ({ latitud: p.latitud, longitud: p.longitud }));
+        // Sigue el trazado por las calles si el recorrido lo tiene.
+        const puntos = caminoDelRecorrido(recorrido?.paraderos ?? [], recorrido?.trazado);
         const largo = largoRecorrido(puntos);
         let recorridos = 0;
         siguientePosicion = () => {
@@ -187,6 +195,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
             origen: nuevoModo,
           });
           setAvance(respuesta);
+          setPosicion(posicion.punto);
           setUltimoEnvio(new Date());
           setEstado('activo');
         } catch (e) {
@@ -234,6 +243,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
             viajeId,
             ultimoEnvio,
             avance,
+            posicion,
             asegurarPermiso,
             comenzar,
             reanudar,
@@ -245,6 +255,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
             viajeId: null,
             ultimoEnvio: null,
             avance: null,
+            posicion: null,
             asegurarPermiso,
             comenzar,
             reanudar,
@@ -257,6 +268,7 @@ export function GpsConductorProvider({ children }: { children: ReactNode }) {
       viajeId,
       ultimoEnvio,
       avance,
+      posicion,
       asegurarPermiso,
       comenzar,
       reanudar,

@@ -67,7 +67,11 @@ const paraderoCambios = paraderoBody.partial().refine((d) => Object.keys(d).leng
   message: 'No hay cambios que guardar',
 });
 
+/** Generar la red de Antofagasta: `descargar` vuelve a bajar las calles aunque haya copia. */
+const generarRedBody = z.object({ descargar: z.boolean().optional() }).optional();
+
 module.exports = {
+  generarRedBody,
   lineaBody,
   lineaCambios,
   recorridoBody,

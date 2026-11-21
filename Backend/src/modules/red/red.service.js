@@ -1,6 +1,7 @@
 // RED-01 (líneas y recorridos) y RED-02 (paraderos): consultas de solo lectura.
 const { Op } = require('sequelize');
 const { HttpError } = require('../../utils/httpErrors');
+const { trazadoUtilizable } = require('../ubicacion/geo');
 
 const AVISO_SUSPENDIDA = 'Esta línea está suspendida temporalmente y no presta servicio.';
 
@@ -47,15 +48,20 @@ function createRedService({ Linea, Recorrido, Paradero, RecorridoParadero }) {
       include: [{ model: Paradero, as: 'paradero', where: { activo: 1 } }],
       order: [['orden', 'ASC']],
     });
-    return recorridos.map((r) => ({
-      id: r.id,
-      sentido: r.sentido,
-      dias_funcionamiento: r.dias_funcionamiento,
-      horarios: r.horarios,
-      paraderos: paradas
+    return recorridos.map((r) => {
+      const paraderos = paradas
         .filter((p) => p.recorrido_id === r.id)
-        .map((p) => ({ orden: p.orden, ...paraderoPublico(p.paradero) })),
-    }));
+        .map((p) => ({ orden: p.orden, ...paraderoPublico(p.paradero) }));
+      return {
+        id: r.id,
+        sentido: r.sentido,
+        dias_funcionamiento: r.dias_funcionamiento,
+        horarios: r.horarios,
+        paraderos,
+        // Puntos [lat, lng] por las calles; null = se dibuja en tramos rectos entre paraderos.
+        trazado: trazadoUtilizable(paraderos, r.trazado),
+      };
+    });
   }
 
   /**

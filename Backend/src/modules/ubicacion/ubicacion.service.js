@@ -17,8 +17,16 @@ function createUbicacionService(
   models,
   { ahora = () => new Date(), permitirSimulacion = false } = {},
 ) {
-  const { sequelize, Usuario, Turno, Viaje, Paradero, RecorridoParadero, UbicacionVehiculo } =
-    models;
+  const {
+    sequelize,
+    Usuario,
+    Turno,
+    Viaje,
+    Recorrido,
+    Paradero,
+    RecorridoParadero,
+    UbicacionVehiculo,
+  } = models;
   const ahoraISO = () => ahora().toISOString();
 
   async function exigirConductor(id, transaction) {
@@ -88,9 +96,18 @@ function createUbicacionService(
         );
 
         const paraderos = await paraderosDelRecorrido(viaje.recorrido_id, transaction);
+        const recorrido = await Recorrido.findByPk(viaje.recorrido_id, {
+          attributes: ['id', 'trazado'],
+          transaction,
+        });
         const precisa = precision === null || precision <= PRECISION_MAXIMA_M;
         const avance = precisa
-          ? calcularAvance(paraderos, viaje.ultimo_orden_superado, { latitud, longitud })
+          ? calcularAvance(
+              paraderos,
+              viaje.ultimo_orden_superado,
+              { latitud, longitud },
+              recorrido?.trazado ?? null,
+            )
           : { ultimoSuperado: viaje.ultimo_orden_superado, lejania: null };
 
         let cerradas = 0;

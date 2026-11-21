@@ -9,6 +9,7 @@ const {
   recorridoCambios,
   paraderoBody,
   paraderoCambios,
+  generarRedBody,
 } = require('./red.admin.schemas');
 
 /** ADM-01 (administrador): se monta en /api/v1/admin/red. */
@@ -33,6 +34,8 @@ function createRedAdminRoutes(c) {
     validar({ params: idParams, body: recorridoCambios }),
     c.editarRecorrido,
   );
+  router.post('/recorridos/:id/trazado', id, c.trazarRecorrido);
+  router.delete('/recorridos/:id/trazado', id, c.quitarTrazado);
 
   router.get('/paraderos', c.listarParaderos);
   router.post('/paraderos', validar({ body: paraderoBody }), c.crearParadero);
@@ -42,6 +45,12 @@ function createRedAdminRoutes(c) {
     validar({ params: idParams, body: paraderoCambios }),
     c.editarParadero,
   );
+
+  // Cambiar toda la red: generar la de Antofagasta real, cargarla o volver a la de prueba.
+  router.get('/importacion', c.estadoImportacion);
+  router.post('/importacion/generar', validar({ body: generarRedBody }), c.generarRed);
+  router.post('/importacion/archivo', c.cargarRedArchivo);
+  router.post('/importacion/prueba', c.volverRedPrueba);
 
   return router;
 }

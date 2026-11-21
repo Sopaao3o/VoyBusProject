@@ -110,8 +110,10 @@ export default function TurnoConductorScreen() {
       setPanel(null);
       await recargar();
       if (mensajeOk) Alert.alert('Listo', mensajeOk);
+      return true;
     } catch (e) {
       Alert.alert('No se pudo completar la acción', textoDeError(e));
+      return false;
     } finally {
       setEnviando(false);
     }
@@ -126,9 +128,18 @@ export default function TurnoConductorScreen() {
   /** VEH-01: sin permiso de ubicación (o con el simulador apagado y sin GPS) no se inicia. */
   async function empezarViaje(v: ViajeConductor) {
     if (modoGps === 'gps' && !(await gps.asegurarPermiso())) return;
-    await ejecutar(async () => {
+    const iniciado = await ejecutar(async () => {
       await iniciarViaje(v.id);
       await gps.comenzar(datosGps(v), modoGps);
+    });
+    if (iniciado) abrirEnRuta(v);
+  }
+
+  /** La pantalla del viaje en ruta: mapa, próximo paradero y paradas solicitadas. */
+  function abrirEnRuta(v: ViajeConductor) {
+    router.push({
+      pathname: '/conductor/viaje/[id]',
+      params: { id: v.id, linea: v.linea_id, recorrido: v.recorrido_id, turno: turnoId },
     });
   }
 
@@ -366,11 +377,7 @@ export default function TurnoConductorScreen() {
                     <Boton titulo="Compartir ubicación" onPress={() => compartirUbicacion(v)} />
                   </>
                 )}
-                <Boton
-                  titulo="Ver solicitudes de parada"
-                  variante="secundario"
-                  onPress={() => router.push(`/conductor/viaje/${v.id}`)}
-                />
+                <Boton titulo="Abrir el viaje en el mapa" onPress={() => abrirEnRuta(v)} />
                 <Boton
                   titulo="Finalizar viaje"
                   variante="peligro"

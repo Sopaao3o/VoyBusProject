@@ -133,6 +133,20 @@ export default function RedScreen() {
             </Pressable>
           ))}
         </View>
+        <Pressable
+          style={({ pressed }) => [styles.antofagasta, pressed && styles.presionada]}
+          onPress={() => router.push('/admin/red-antofagasta')}
+          accessibilityRole="button"
+        >
+          <Ionicons name="map" size={22} color={colors.primary} />
+          <View style={styles.textos}>
+            <Text style={styles.titulo}>Red real de Antofagasta</Text>
+            <Text style={styles.dato}>
+              Generar las líneas reales por las calles, o volver a la de prueba
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
         <Boton
           titulo={vista === 'lineas' ? 'Nueva línea' : 'Nuevo paradero'}
           onPress={() =>
@@ -173,6 +187,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   presionada: { opacity: 0.6 },
+  antofagasta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#E8F0FC',
+    borderRadius: 12,
+    padding: 12,
+  },
   textos: { flex: 1, gap: 2 },
   titulo: { fontSize: 16, fontWeight: '600', color: colors.text },
   dato: { fontSize: 13, color: colors.textMuted },

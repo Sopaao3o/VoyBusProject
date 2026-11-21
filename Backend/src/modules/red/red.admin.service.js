@@ -7,14 +7,25 @@
 //  - Los cambios no alteran los viajes en curso: mientras un recorrido tenga viajes en curso
 //    no se cambian sus paraderos, y un paradero en uso no se mueve ni se desactiva.
 //    Días, horarios, nombres y colores sí se pueden cambiar en cualquier momento.
+//  - El trazado por las calles de un recorrido se genera con sus paraderos. Si cambian sus
+//    paraderos, o se mueve uno, el trazado se borra (queda en tramos rectos) hasta volver a
+//    generarlo. Tampoco se cambia con viajes en curso.
 const { Op, fn, col, where: condicion } = require('sequelize');
-const { notFound, conflict, badRequest } = require('../../utils/httpErrors');
+const { notFound, conflict, badRequest, HttpError } = require('../../utils/httpErrors');
+const { leerTrazado, distancia } = require('../ubicacion/geo');
+const { trazarPorCalles, ErrorTrazado } = require('./trazado');
+
+/** Un paradero que se mueve menos que esto no invalida el trazado (es una corrección fina). */
+const MOVIMIENTO_QUE_BORRA_TRAZADO_M = 15;
 
 /**
  * Ojo: con una sola conexión SQLite, toda consulta dentro de una transacción lleva `{ transaction }`.
  * @param {ReturnType<import('../../database/models').initModels>} models
  */
-function createRedAdminService(models) {
+function createRedAdminService(
+  models,
+  { trazador = trazarPorCalles, ahora = () => new Date() } = {},
+) {
   const { sequelize, Linea, Recorrido, Paradero, RecorridoParadero, Viaje } = models;
 
   const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
@@ -103,7 +114,24 @@ function createRedAdminService(models) {
       activo: Boolean(r.activo),
       viajes_en_curso: await viajesEnCursoDeRecorrido(r.id, transaction),
       paraderos: await paradasDe(r.id, transaction),
+      trazado: leerTrazado(r.trazado) ? JSON.parse(r.trazado) : null,
+      trazado_actualizado_en: r.trazado_actualizado_en ?? null,
     };
+  }
+
+  const SIN_TRAZADO = { trazado: null, trazado_actualizado_en: null };
+
+  /** Borra el trazado de los recorridos que pasan por un paradero. */
+  async function borrarTrazadosConParadero(paraderoId, transaction) {
+    const usos = await RecorridoParadero.findAll({
+      where: { paradero_id: paraderoId },
+      transaction,
+    });
+    if (usos.length === 0) return;
+    await Recorrido.update(SIN_TRAZADO, {
+      where: { id: { [Op.in]: usos.map((u) => u.recorrido_id) } },
+      transaction,
+    });
   }
 
   const presentarLinea = (l) => ({
@@ -267,12 +295,78 @@ function createRedAdminService(models) {
               );
             }
             await guardarParadas(id, await validarParaderos(paraderos, transaction), transaction);
+            // El trazado pasaba por los paraderos anteriores: hay que volver a generarlo.
+            await recorrido.update(SIN_TRAZADO, { transaction });
           }
         }
         await recorrido.update(
           { ...resto, ...(activo === undefined ? {} : { activo: activo ? 1 : 0 }) },
           { transaction },
         );
+        return presentarRecorrido(recorrido, transaction);
+      });
+    },
+
+    /**
+     * Genera el trazado por las calles del recorrido, pasando por sus paraderos en orden.
+     * La consulta al servicio de rutas se hace fuera de la transacción (puede tardar).
+     */
+    async trazarRecorrido(id) {
+      const recorrido = await Recorrido.findByPk(id);
+      if (!recorrido) throw notFound('El recorrido no existe');
+      const enCurso = await viajesEnCursoDeRecorrido(id);
+      if (enCurso > 0) {
+        throw conflict(
+          `Este recorrido tiene ${plural(enCurso, 'viaje', 'viajes')} en curso: el trazado se podrá generar cuando ${enCurso === 1 ? 'termine' : 'terminen'}.`,
+        );
+      }
+      const paradas = await paradasDe(id);
+      const firma = paradas.map((p) => `${p.id}:${p.latitud}:${p.longitud}`).join('|');
+      let resultado;
+      try {
+        resultado = await trazador(paradas);
+      } catch (err) {
+        if (err instanceof ErrorTrazado) {
+          const status = err.codigo === 'SIN_CONEXION' ? 503 : 422;
+          throw new HttpError(status, err.message, { code: `TRAZADO_${err.codigo}` });
+        }
+        throw err;
+      }
+      return sequelize.transaction(async (transaction) => {
+        // Si alguien cambió los paraderos mientras se calculaba, el trazado ya no sirve.
+        const ahoraParadas = await paradasDe(id, transaction);
+        const ahoraFirma = ahoraParadas.map((p) => `${p.id}:${p.latitud}:${p.longitud}`).join('|');
+        if (ahoraFirma !== firma) {
+          throw conflict(
+            'Los paraderos del recorrido cambiaron mientras se generaba el trazado. Inténtalo de nuevo.',
+          );
+        }
+        await recorrido.update(
+          {
+            trazado: JSON.stringify(resultado.trazado),
+            trazado_actualizado_en: ahora().toISOString(),
+          },
+          { transaction },
+        );
+        return {
+          ...(await presentarRecorrido(recorrido, transaction)),
+          largo_m: resultado.largo_m,
+        };
+      });
+    },
+
+    /** Vuelve a dibujar el recorrido en tramos rectos entre paraderos. */
+    async quitarTrazado(id) {
+      return sequelize.transaction(async (transaction) => {
+        const recorrido = await Recorrido.findByPk(id, { transaction });
+        if (!recorrido) throw notFound('El recorrido no existe');
+        const enCurso = await viajesEnCursoDeRecorrido(id, transaction);
+        if (enCurso > 0) {
+          throw conflict(
+            `Este recorrido tiene ${plural(enCurso, 'viaje', 'viajes')} en curso: el trazado se podrá quitar cuando ${enCurso === 1 ? 'termine' : 'terminen'}.`,
+          );
+        }
+        await recorrido.update(SIN_TRAZADO, { transaction });
         return presentarRecorrido(recorrido, transaction);
       });
     },
@@ -338,6 +432,15 @@ function createRedAdminService(models) {
             throw conflict(
               `Hay ${plural(enCurso, 'viaje', 'viajes')} en curso que ${enCurso === 1 ? 'pasa' : 'pasan'} por este paradero: podrás ${seDesactiva ? 'desactivarlo' : 'moverlo'} cuando ${enCurso === 1 ? 'termine' : 'terminen'}.`,
             );
+          }
+        }
+        if (seMueve) {
+          const movido = distancia(p, {
+            latitud: cambios.latitud ?? p.latitud,
+            longitud: cambios.longitud ?? p.longitud,
+          });
+          if (movido > MOVIMIENTO_QUE_BORRA_TRAZADO_M) {
+            await borrarTrazadosConParadero(id, transaction);
           }
         }
         const { activo, ...resto } = cambios;

@@ -19,7 +19,11 @@ async function iniciar() {
   // Primera ejecución: carga los datos de ejemplo para poder probar de inmediato.
   // Los usuarios de demostración (contraseña conocida) solo existen fuera de producción.
   if ((await models.Linea.count()) === 0) {
-    await cargarDatosEjemplo(models, { usuariosDemo: process.env.NODE_ENV !== 'production' });
+    const { catalogo } = await cargarDatosEjemplo(models, {
+      usuariosDemo: process.env.NODE_ENV !== 'production',
+      catalogo: process.env.CATALOGO || 'antofagasta',
+    });
+    console.log(`Datos de ejemplo cargados (red: ${catalogo})`);
   }
 
   const app = createApp({

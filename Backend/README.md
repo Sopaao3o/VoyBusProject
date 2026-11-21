@@ -9,6 +9,7 @@ Todo el proyecto funciona sin servicios de pago: la base de datos es un archivo 
 cd Backend
 npm install
 cp .env.example .env        # en Windows (PowerShell): Copy-Item .env.example .env
+npm run catalogo:antofagasta   # una sola vez, con internet: genera las líneas reales (ver abajo)
 npm run db:reset            # crea la base con las migraciones y los datos de ejemplo
 npm run dev                 # reinicia solo al guardar cambios
 ```
@@ -17,16 +18,17 @@ Comprobar: <http://localhost:3000/api/health> y <http://localhost:3000/api/v1/li
 
 ## Scripts
 
-| Comando                | Qué hace                                                       |
-| ---------------------- | -------------------------------------------------------------- |
-| `npm start`            | Arranca el servidor                                            |
-| `npm run dev`          | Arranca con recarga automática                                 |
-| `npm run db:migrar`    | Aplica las migraciones pendientes                              |
-| `npm run db:reset`     | Borra la base, aplica las migraciones y carga datos de ejemplo |
-| `npm test`             | Ejecuta las pruebas automáticas (137)                          |
-| `npm run lint`         | Revisa el código con ESLint                                    |
-| `npm run format`       | Da formato a todos los archivos con Prettier                   |
-| `npm run format:check` | Comprueba el formato sin modificar nada                        |
+| Comando                        | Qué hace                                                       |
+| ------------------------------ | -------------------------------------------------------------- |
+| `npm start`                    | Arranca el servidor                                            |
+| `npm run dev`                  | Arranca con recarga automática                                 |
+| `npm run db:migrar`            | Aplica las migraciones pendientes                              |
+| `npm run db:reset`             | Borra la base, aplica las migraciones y carga datos de ejemplo |
+| `npm run catalogo:antofagasta` | Genera el catálogo de líneas reales de Antofagasta             |
+| `npm test`                     | Ejecuta las pruebas automáticas (222)                          |
+| `npm run lint`                 | Revisa el código con ESLint                                    |
+| `npm run format`               | Da formato a todos los archivos con Prettier                   |
+| `npm run format:check`         | Comprueba el formato sin modificar nada                        |
 
 ## Estructura
 
@@ -524,6 +526,9 @@ quedado de una simulación anterior.
 | `GET /api/v1/admin/red/paraderos/:id`          | Paradero con los recorridos que lo usan.                                                     |
 | `PUT /api/v1/admin/red/paraderos/:id`          | Edita, mueve o activa/desactiva.                                                             |
 
+| `POST /api/v1/admin/red/recorridos/:id/trazado` | Traza el recorrido por las calles, por sus paraderos en orden (OSRM). |
+| `DELETE /api/v1/admin/red/recorridos/:id/trazado` | Quita el trazado: vuelve a tramos rectos entre paraderos. |
+
 - Los códigos de líneas y de paraderos no se repiten (sin distinguir mayúsculas): 409.
 - Un recorrido necesita al menos 2 paraderos activos, sin repetir; uno por sentido y línea.
 - Desactivar una línea, un recorrido o un paradero lo oculta de las consultas públicas e impide
@@ -531,6 +536,47 @@ quedado de una simulación anterior.
 - **Los cambios no alteran los viajes en curso:** mientras un recorrido tenga viajes en curso no
   se cambian sus paraderos, y un paradero en uso no se mueve ni se desactiva (409, indicando
   cuántos viajes hay). Días, horarios, nombres y colores se pueden cambiar siempre.
+- **Trazado por las calles:** se calcula con OSRM (gratis, sobre OpenStreetMap; respeta los
+  sentidos del tránsito). Si se cambian los paraderos del recorrido o se mueve uno más de 15 m,
+  el trazado se borra y hay que volver a generarlo. Con viajes en curso no se cambia (409). Un
+  paradero a más de 50 m de una calle se informa por su nombre (422); sin internet, 503.
+  Las consultas públicas entregan `trazado` (puntos `[lat, lng]`) o `null` (tramos rectos), y
+  el avance de las micros (VEH-01) y las distancias de RED-03 se miden por ese trazado.
+
+## Catálogo "Antofagasta real"
+
+**Desde la app (administrador):** pestaña Red → "Red real de Antofagasta". Ahí se genera
+(el servidor descarga las calles y traza las líneas en segundo plano, con avance en pantalla),
+se vuelve a cargar la ya generada o se vuelve a la red de prueba. Nada se borra: lo que no es
+de la red elegida queda desactivado. Con viajes en curso no se cambia (409; detén antes el
+simulador de flota).
+
+| Método y ruta                                | Descripción                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `GET /api/v1/admin/red/importacion`          | Red activa, catálogo generado (si hay) y avance de la generación. |
+| `POST /api/v1/admin/red/importacion/generar` | Genera y aplica la red real (202). Body opcional: `descargar`.    |
+| `POST /api/v1/admin/red/importacion/archivo` | Aplica la red ya generada (404 si no hay).                        |
+| `POST /api/v1/admin/red/importacion/prueba`  | Vuelve a la red de prueba.                                        |
+
+**Desde la terminal:** `npm run db:reset` carga la red indicada en `CATALOGO` (`.env`): `antofagasta` (por defecto)
+o `prueba` (la red pequeña que usan las pruebas automáticas). El catálogo de Antofagasta tiene
+6 líneas reales (102, 103, 107, 108, 119 y 129) con ida y vuelta por las calles, y se genera
+**una vez** con internet:
+
+```bash
+npm run catalogo:antofagasta      # unos 2 minutos; crea src/database/seeders/antofagasta.json
+npm run db:reset
+```
+
+- **Itinerarios:** Letreros Únicos de Recorrido del Perímetro de Exclusión de Antofagasta
+  (DTPR, Ministerio de Transportes). Están en `src/modules/red/antofagasta/lineas.js`.
+- **Calles y paraderos:** © colaboradores de OpenStreetMap (licencia ODbL), con la API Overpass.
+- **Trazado:** OSRM. El generador busca cada calle del itinerario, calcula dónde se cruzan,
+  traza el camino y ubica paraderos cada 350 a 900 m (los de OpenStreetMap, las esquinas donde
+  la micro dobla y, si falta, intermedios), con nombres como "Avenida Angamos / Uribe".
+- Al terminar muestra lo que conviene revisar y deja `data/antofagasta-vista-previa.geojson`
+  para verlo en <https://geojson.io>. Cualquier detalle se corrige después desde la app (ADM-01).
+- Trazados y paraderos son aproximados; días, horarios y colores son de demostración.
 
 ## Avisos de parada (VEH-02)
 

@@ -32,7 +32,12 @@ export interface Recorrido {
   dias_funcionamiento: string;
   horarios: string;
   paraderos: ParaderoDeRecorrido[];
+  /** Camino por las calles, puntos [latitud, longitud]. null = tramos rectos entre paraderos. */
+  trazado?: Trazado | null;
 }
+
+/** Puntos [latitud, longitud] de un recorrido por las calles. */
+export type Trazado = [number, number][];
 
 export interface LineaDetalle extends Linea {
   recorridos: Recorrido[];
@@ -184,6 +189,9 @@ export interface SolicitudParada {
 export interface ParaderosDisponibles {
   /** VIA-03: hora de la última ubicación de la micro y si la información está atrasada. */
   ubicacion_vehiculo: {
+    /** Última posición conocida de la micro (null si todavía no envía). */
+    latitud: number | null;
+    longitud: number | null;
     registrado_en: string | null;
     segundos_desde_actualizacion: number | null;
     informacion_atrasada: boolean;
@@ -195,7 +203,15 @@ export interface ParaderosDisponibles {
     linea_codigo: string;
     linea_nombre: string;
     ultimo_orden_superado: number;
+    linea_color: string;
   };
+  /** Todo el recorrido, para el mapa. */
+  recorrido: {
+    id: number;
+    paraderos: (ParaderoDeRecorrido & { superado: boolean })[];
+    trazado: Trazado | null;
+  };
+  /** Los paraderos que faltan (donde todavía se puede pedir parada). */
   paraderos: ParaderoDeRecorrido[];
   mi_solicitud: SolicitudParada | null;
 }
@@ -468,6 +484,8 @@ export interface RecorridoAdmin {
   activo: boolean;
   viajes_en_curso: number;
   paraderos: ParaderoDeRecorridoAdmin[];
+  trazado: Trazado | null;
+  trazado_actualizado_en: string | null;
 }
 
 export interface LineaAdminDetalle extends Omit<LineaAdmin, 'recorridos'> {
@@ -506,4 +524,35 @@ export interface ParaderoBody {
   latitud: number;
   longitud: number;
   activo?: boolean;
+}
+
+// ───── ADM-01: cambiar toda la red (red real de Antofagasta o de prueba) ─────
+
+export interface ResultadoCambioRed {
+  lineas_creadas: number;
+  lineas_actualizadas: number;
+  lineas_desactivadas: number;
+  paraderos_creados: number;
+  paraderos_actualizados: number;
+  paraderos_desactivados: number;
+}
+
+export interface TareaGenerarRed {
+  estado: 'inactiva' | 'en_curso' | 'lista' | 'error';
+  fase?: 'descargando' | 'trazando' | 'aplicando' | 'lista';
+  mensaje?: string;
+  /** Recorridos trazados de `total`. */
+  hechos?: number;
+  total?: number;
+  avisos?: string[];
+  resultado?: ResultadoCambioRed;
+  iniciada_en?: string;
+  terminada_en?: string;
+}
+
+export interface EstadoRed {
+  red_actual: 'antofagasta' | 'prueba';
+  /** La red de Antofagasta ya generada, o null si todavía no se genera. */
+  archivo: { generado_en: string | null; lineas: string[]; total_paraderos: number } | null;
+  tarea: TareaGenerarRed;
 }
